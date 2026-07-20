@@ -60,6 +60,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // Balance read is public (frontend dashboard before login)
                         .requestMatchers("/api/v1/wallet/balance/**").permitAll()
+                        // Market data and WebSocket endpoints are public (no auth required for price feeds)
+                        .requestMatchers("/api/v1/market/**").permitAll()
+                        .requestMatchers("/ws/**", "/topic/**").permitAll()
                         // All other wallet mutations require a valid JWT
                         .anyRequest().authenticated()
                 )

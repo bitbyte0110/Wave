@@ -75,21 +75,37 @@
   * Configure `SecurityFilterChain` in `SecurityConfig.java`: permit `/api/v1/auth/**` and `/api/v1/wallet/balance/**`; require authentication for all other wallet mutations.
   * Hash passwords with `BCryptPasswordEncoder`.
 
-### Stage 8 — Redis Idempotency Cache
-* **Goal:** Honour the PRD's Redis-based idempotency store to deduplicate replayed `X-Idempotency-Key` requests.
-* **Tasks:**
-  * Add `spring-boot-starter-data-redis` to `pom.xml`.
-  * Create `IdempotencyService.java` backed by `RedisTemplate<String, String>`.
-  * On each `withdraw` / `swap` request: check if the key exists in Redis → return cached response body if hit; otherwise execute and store the result with a TTL (e.g., 24 h).
-  * Inject `IdempotencyService` into `WalletController` and wrap the mutation calls.
+## 8. Redis Idempotency Cache (Completed)
+* **Packages:** `com.wave.terminal.service`
+* **Dependencies Added (`pom.xml`):** `spring-boot-starter-data-redis`, `jackson-databind`.
+* **Classes Built:**
+  * `IdempotencyService.java`: Backed by `StringRedisTemplate`. Stores response JSON under key `idempotency:<uuid>` with a configurable TTL (default 24 h via `app.idempotency.ttl-seconds`).
+* **Controller Changes (`WalletController.java`):**
+  * `POST /withdraw` — checks cache before executing; writes result to cache on success.
+  * `POST /swap` — same pattern.
+  * `POST /deposit` — intentionally **not** cached (credit operation is safe to replay).
+* **Key Design Decisions:**
+  * `StringRedisTemplate` used over generic `RedisTemplate` — values stored as human-readable JSON, no JDK serialisation coupling.
+  * Deserialisation errors on cache-read are treated as misses (non-fatal) so a corrupted Redis entry never permanently blocks a legitimate retry.
+  * Failed cache-writes (after a successful DB operation) are logged as warnings but do not surface to the client — the operation already succeeded.
 
-### Stage 9 — Market Streaming Service (WebSocket + Redis Cache)
-* **Goal:** Stream live BTC/USDC price ticks to the frontend; cache macro stats (Global Cap, 24h Volume) in Redis.
-* **Tasks:**
-  * Add `spring-boot-starter-websocket` to `pom.xml`.
-  * Configure `WebSocketMessageBrokerConfigurer` with a STOMP endpoint at `/ws` and a `/topic` destination prefix.
-  * Create `MarketPriceScheduler.java`: poll an external price feed (e.g., CoinGecko public API) every second; write to Redis; broadcast via `SimpMessagingTemplate` to `/topic/prices`.
-  * Create `MarketRestController.java`: `GET /api/v1/market/overview` reads the Redis macro-stats key and returns JSON.
+## 9. Market Streaming Service (Completed)
+* **Packages:** `com.wave.terminal.config`, `com.wave.terminal.service`, `com.wave.terminal.controller`, `com.wave.terminal.controller.dto`
+* **Classes Built:**
+  * `WebSocketConfig.java`: Configures STOMP broker — endpoint `/ws` with SockJS fallback, in-memory broker on `/topic` and `/queue`, app prefix `/app`.
+  * `MarketPriceScheduler.java`: Dual-frequency scheduler (PRD §3 isolation pattern):
+    * `fetchAndBroadcastPriceTick()` — every 5 s: polls CoinGecko `/simple/price`, caches `PriceTick` in Redis under `market:price:tick`, broadcasts to STOMP `/topic/prices`.
+    * `fetchAndCacheMarketOverview()` — every 60 s: polls CoinGecko `/global`, writes `MarketOverview` to Redis under `market:overview`.
+  * `MarketController.java`: `GET /api/v1/market/overview` and `GET /api/v1/market/price/tick` — read from Redis cache only (zero live API calls on GET).
+  * DTOs: `PriceTick` and `MarketOverview`.
+* **Config Changes:**
+  * `TerminalApplication.java` — added `@EnableScheduling`.
+  * `SecurityConfig.java` — added `/api/v1/market/**`, `/ws/**`, `/topic/**` to public permit list.
+* **Key Design Decisions:**
+  * Java built-in `HttpClient` used — no additional dependency required.
+  * `GET /api/v1/market/price/tick` bonus endpoint lets the frontend seed initial data before the WebSocket subscribes.
+  * 5 s polling = 12 req/min — safely within CoinGecko's free-tier rate limit of ~30 req/min.
+  * All scheduler failures are caught and logged — a single CoinGecko timeout never kills the scheduler thread.
 
 ### Stage 10 — AI Async Risk Audit Service (RabbitMQ Consumer + Gemini)
 * **Goal:** Consume `swap.events` from RabbitMQ, call an LLM (Gemini/OpenRouter), and write the AI remark back to the `transactions` table.

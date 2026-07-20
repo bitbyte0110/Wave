@@ -6,6 +6,7 @@ import com.wave.terminal.controller.dto.SwapRequest;
 import com.wave.terminal.controller.dto.WithdrawRequest;
 import com.wave.terminal.entity.Wallet;
 import com.wave.terminal.repository.WalletRepository;
+import com.wave.terminal.service.IdempotencyService;
 import com.wave.terminal.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -35,6 +37,7 @@ public class WalletController {
 
     private final WalletService walletService;
     private final WalletRepository walletRepository;
+    private final IdempotencyService idempotencyService;
 
     // -------------------------------------------------------------------------
     // POST /deposit
@@ -88,6 +91,13 @@ public class WalletController {
                     .body(errorBody("X-Idempotency-Key must be a valid UUIDv4 string."));
         }
 
+        // ── Idempotency cache check ────────────────────────────────────────
+        Optional<BalanceResponse> cached =
+                idempotencyService.getCachedResponse(idempotencyKey, BalanceResponse.class);
+        if (cached.isPresent()) {
+            return ResponseEntity.ok(cached.get());
+        }
+
         log.info("WITHDRAW ▶ userId={} asset={} amount={} idempotencyKey={}",
                 request.userId(), request.asset(), request.amount(), idempotencyKey);
         try {
@@ -96,7 +106,9 @@ public class WalletController {
                     request.asset(),
                     request.amount()
             );
-            return ResponseEntity.ok(toBalanceResponse(updated));
+            BalanceResponse response = toBalanceResponse(updated);
+            idempotencyService.cacheResponse(idempotencyKey, response);
+            return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
             log.warn("WITHDRAW FAILED – {}", ex.getMessage());
             return ResponseEntity.badRequest().body(errorBody(ex.getMessage()));
@@ -128,6 +140,13 @@ public class WalletController {
                     .body(errorBody("X-Idempotency-Key must be a valid UUIDv4 string."));
         }
 
+        // ── Idempotency cache check ────────────────────────────────────────
+        Optional<BalanceResponse> cached =
+                idempotencyService.getCachedResponse(idempotencyKey, BalanceResponse.class);
+        if (cached.isPresent()) {
+            return ResponseEntity.ok(cached.get());
+        }
+
         log.info("SWAP ▶ userId={} {} → {} amount={} idempotencyKey={}",
                 request.userId(), request.fromAsset(), request.toAsset(),
                 request.fromAmount(), idempotencyKey);
@@ -139,7 +158,9 @@ public class WalletController {
                     request.fromAmount(),
                     request.toAmount()
             );
-            return ResponseEntity.ok(toBalanceResponse(updated));
+            BalanceResponse response = toBalanceResponse(updated);
+            idempotencyService.cacheResponse(idempotencyKey, response);
+            return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
             log.warn("SWAP FAILED – {}", ex.getMessage());
             return ResponseEntity.badRequest().body(errorBody(ex.getMessage()));
