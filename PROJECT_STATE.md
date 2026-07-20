@@ -1,16 +1,16 @@
 # Wave Terminal - Project State
 
-## 🏗️ 1. Infrastructure (Completed)
+## 1. Infrastructure (Completed)
 * **Docker Compose (`docker-compose.yml`):** Deployed MySQL 8.0 (Port 3307), Redis 7.0 (Port 6379), and RabbitMQ (Ports 5672/15672).
 * **Network Status:** All containers running successfully on the local environment without port conflicts.
 
-## ⚙️ 2. Backend Base Setup (Completed)
+##  2. Backend Base Setup (Completed)
 * **Framework:** Spring Boot 3.3.x (Java 17, Maven).
 * **Location:** `E:\Development\Wave\terminal\`
 * **Dependencies:** Spring Web, Spring Data JPA, MySQL Driver, Spring for RabbitMQ, Lombok.
 * **Configuration:** `application.properties` configured for Docker port 3307 mapping, JPA `update` DDL, and RabbitMQ defaults.
 
-## 🗃️ 3. Data Entities (Completed)
+## 3. Data Entities (Completed)
 * **Package:** `com.wave.terminal.entity`
 * **Models Built:**
   * `TransactionType.java`: Enum (`DEPOSIT`, `WITHDRAW`, `SWAP`).
@@ -18,19 +18,131 @@
   * `Wallet.java`: Holds `usdcBalance` (18,4 precision) and `btcBalance` (18,8 precision).
   * `Transaction.java`: Immutable ledger for financial audit history.
 
-## 🔒 4. Repository Layer (Completed)
+## 4. Repository Layer (Completed)
 * **Package:** `com.wave.terminal.repository`
 * **Interfaces Built:**
   * `UserRepository.java`
   * `TransactionRepository.java`
   * `WalletRepository.java`: Implemented crucial pessimistic locking (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) on `findByUserIdForUpdate` to prevent concurrent double-spending.
 
-## 🧠 5. Service & Messaging Layer (Completed)
+## 5. Service & Messaging Layer (Completed)
 * **Packages:** `com.wave.terminal.service`, `com.wave.terminal.config`
 * **Classes Built:**
   * `RabbitMQConfig.java`: Configured `swap.events` FanoutExchange using `JacksonJsonMessageConverter`.
   * `WalletService.java`: Implemented `@Transactional` logic for `simulateDeposit`, `executeWithdraw`, and `executeSwap`. Includes strict post-lock balance validations and RabbitMQ async event publishing.
 
-## 🚀 6. Next Pending Task
-* **Target:** Build the REST Controller Layer.
-* **Action:** Create `WalletController.java` inside `com.wave.terminal.controller` to expose `/deposit`, `/withdraw`, `/swap`, and `/balance/{userId}` endpoints to the Next.js frontend.
+## 6. REST Controller Layer (Completed)
+* **Packages:** `com.wave.terminal.controller`, `com.wave.terminal.controller.dto`
+* **Classes Built:**
+  * `DepositRequest.java` (record): Request body for `POST /api/v1/wallet/deposit`.
+  * `WithdrawRequest.java` (record): Request body for `POST /api/v1/wallet/withdraw`.
+  * `SwapRequest.java` (record): Request body for `POST /api/v1/wallet/swap`.
+  * `BalanceResponse.java` (record): Lightweight read projection for `GET /api/v1/wallet/balance/{userId}`. Decoupled from the JPA entity to avoid lazy-loading the `User` association during JSON serialisation.
+  * `WalletController.java`: Exposes all four endpoints under `/api/v1/wallet` with `@CrossOrigin(origins = "*")` for the Next.js dev server.
+* **Key Design Decisions:**
+  * `X-Idempotency-Key` header validated as a proper UUIDv4 before the service is called; malformed keys return HTTP 400 immediately.
+  * Error responses always use a uniform `{ "error": "..." }` JSON envelope so the frontend has a predictable error shape.
+  * `GET /balance/{userId}` uses the non-locking `findByUserId` to avoid competing for the `FOR UPDATE` row lock during read-only queries.
+
+## 7. Authentication Layer (Completed)
+* **Packages:** `com.wave.terminal.security`, `com.wave.terminal.config`, `com.wave.terminal.service`, `com.wave.terminal.controller`, `com.wave.terminal.controller.dto`
+* **Dependencies Added (`pom.xml`):** `spring-boot-starter-security`, `jjwt-api:0.12.6`, `jjwt-impl:0.12.6`, `jjwt-jackson:0.12.6`.
+* **Classes Built:**
+  * `JwtUtil.java`: Generates and validates HS256 JWTs. Embeds `userId` as a custom claim. Secret loaded from `application.properties` as Base64.
+  * `UserDetailsServiceImpl.java`: Implements `UserDetailsService`. Maps `User.email` → Spring Security principal, `User.passwordHash` → credential.
+  * `JwtAuthFilter.java`: `OncePerRequestFilter`. Reads `Authorization: Bearer`, validates JWT, populates `SecurityContextHolder`.
+  * `SecurityConfig.java`: Stateless `SecurityFilterChain`. Public: `/api/v1/auth/**`, `GET /api/v1/wallet/balance/**`. Secured: all other routes. Exposes `AuthenticationManager` + `BCryptPasswordEncoder` beans.
+  * `AuthService.java`: `register()` hashes password, persists `User`, provisions zero-balance `Wallet`, issues JWT. `login()` delegates to `AuthenticationManager`, issues JWT.
+  * `AuthController.java`: `POST /api/v1/auth/register` and `POST /api/v1/auth/login`. Public routes, uniform `{ "error": "..." }` envelope on 4xx.
+  * DTOs: `RegisterRequest`, `LoginRequest`, `AuthResponse` (includes `token`, `userId`, `username`, `email`).
+* **Key Design Decisions:**
+  * `AuthService.register()` is `@Transactional` — `User` and `Wallet` rows are created atomically.
+  * `AuthResponse` includes `userId` so the frontend never needs a separate `/me` call.
+  * CORS handled at the `SecurityFilterChain` level (not just `@CrossOrigin`) to correctly pre-flight secured routes.
+
+---
+
+## Staged Roadmap to Project Completion
+
+### Stage 7 — Authentication Layer (Spring Security + JWT)
+* **Goal:** Secure all mutation endpoints behind stateless JWT authentication.
+* **Tasks:**
+  * Add `spring-boot-starter-security` and `jjwt` (e.g., `io.jsonwebtoken:jjwt-api`) to `pom.xml`.
+  * Create `AuthController.java` with `POST /api/v1/auth/register` and `POST /api/v1/auth/login` endpoints.
+  * Implement `UserDetailsServiceImpl.java` loading users from `UserRepository`.
+  * Create `JwtUtil.java` (token generation, validation, claim extraction).
+  * Create `JwtAuthFilter.java` (`OncePerRequestFilter`) to validate Bearer tokens on every request.
+  * Configure `SecurityFilterChain` in `SecurityConfig.java`: permit `/api/v1/auth/**` and `/api/v1/wallet/balance/**`; require authentication for all other wallet mutations.
+  * Hash passwords with `BCryptPasswordEncoder`.
+
+### Stage 8 — Redis Idempotency Cache
+* **Goal:** Honour the PRD's Redis-based idempotency store to deduplicate replayed `X-Idempotency-Key` requests.
+* **Tasks:**
+  * Add `spring-boot-starter-data-redis` to `pom.xml`.
+  * Create `IdempotencyService.java` backed by `RedisTemplate<String, String>`.
+  * On each `withdraw` / `swap` request: check if the key exists in Redis → return cached response body if hit; otherwise execute and store the result with a TTL (e.g., 24 h).
+  * Inject `IdempotencyService` into `WalletController` and wrap the mutation calls.
+
+### Stage 9 — Market Streaming Service (WebSocket + Redis Cache)
+* **Goal:** Stream live BTC/USDC price ticks to the frontend; cache macro stats (Global Cap, 24h Volume) in Redis.
+* **Tasks:**
+  * Add `spring-boot-starter-websocket` to `pom.xml`.
+  * Configure `WebSocketMessageBrokerConfigurer` with a STOMP endpoint at `/ws` and a `/topic` destination prefix.
+  * Create `MarketPriceScheduler.java`: poll an external price feed (e.g., CoinGecko public API) every second; write to Redis; broadcast via `SimpMessagingTemplate` to `/topic/prices`.
+  * Create `MarketRestController.java`: `GET /api/v1/market/overview` reads the Redis macro-stats key and returns JSON.
+
+### Stage 10 — AI Async Risk Audit Service (RabbitMQ Consumer + Gemini)
+* **Goal:** Consume `swap.events` from RabbitMQ, call an LLM (Gemini/OpenRouter), and write the AI remark back to the `transactions` table.
+* **Tasks:**
+  * Create `AuditConsumer.java` annotated with `@RabbitListener(queues = "swap.audit.queue")`.
+  * In `RabbitMQConfig.java`, bind the audit queue to `swap.events` FanoutExchange.
+  * Inject an `HttpClient` (or `WebClient`) to call the Gemini API with transaction context.
+  * On LLM response: execute a soft `UPDATE transactions SET ai_audit_remark = ? WHERE id = ?` via `TransactionRepository`.
+  * Create `NotificationPublisher.java` that publishes a completion event back to a `audit.done` queue.
+
+### Stage 11 — Notification Push Service (WebSocket to Frontend)
+* **Goal:** Push the AI audit result down the active WebSocket connection to the correct user's notification bell.
+* **Tasks:**
+  * Create `NotificationConsumer.java` listening to `audit.done` queue.
+  * On event receipt: resolve the STOMP session for the target `userId` and send a formatted Markdown summary to `/queue/notifications/{userId}`.
+  * Frontend subscribes to this personal queue on mount and updates the notification bell counter + toast.
+
+### Stage 12 — Frontend: Auth Gateway (Next.js)
+* **Goal:** Build `register` and `login` pages wired to the Spring Boot auth endpoints.
+* **Tasks:**
+  * Create `app/register/page.tsx` and `app/login/page.tsx` with Shadcn UI form components.
+  * On successful login: store JWT in `localStorage`; inject into `Authorization: Bearer` headers for all subsequent API calls.
+  * Auto-redirect authenticated users to the dashboard.
+
+### Stage 13 — Frontend: Market Console & WebSocket Integration
+* **Goal:** Module B — Live price tickers with green/red micro-flash animations.
+* **Tasks:**
+  * Connect to `/ws` STOMP endpoint on mount; subscribe to `/topic/prices`.
+  * Use `useRef` + partial updates to prevent global re-renders on tick.
+  * Display Global Cap and 24h Volume via `GET /api/v1/market/overview` (polled every 30s).
+
+### Stage 14 — Frontend: Wallet Modules (Deposit, Withdraw, Swap, Ledger)
+* **Goal:** Modules C, D, E — wire to all `WalletController` endpoints.
+* **Tasks:**
+  * Module E (Deposit): 2s mock spinner → `POST /deposit` → balance update.
+  * Module E (Withdraw): client-side pre-check → `POST /withdraw` with `X-Idempotency-Key` → balance update.
+  * Module D (Swap): 5s countdown rate-lock wheel → `POST /swap` with `X-Idempotency-Key` → balance update → subscribe to `/queue/notifications/{userId}` for AI audit toast.
+  * Module C (Ledger): `GET /api/v1/wallet/transactions/{userId}` (add this endpoint) → Recharts donut chart + immutable table.
+
+### Stage 15 — Docker & Kubernetes Packaging
+* **Goal:** Package the full application for local Kubernetes deployment with Minikube.
+* **Tasks:**
+  * Write `Dockerfile` for the Spring Boot backend (multi-stage build with Maven + JRE 17 slim).
+  * Write `Dockerfile` for the Next.js frontend.
+  * Create Kubernetes manifests: `Deployment`, `Service`, `ConfigMap`, `Secret` for each service.
+  * Update `docker-compose.yml` to include the Spring Boot and Next.js containers alongside the existing infrastructure.
+  * Validate end-to-end with `minikube start` + `kubectl apply -f k8s/`.
+
+### Stage 16 — Final Polish & Testing
+* **Goal:** Production-readiness hardening.
+* **Tasks:**
+  * Write `WalletControllerTest.java` (MockMvc slice tests for all four endpoints).
+  * Write `WalletServiceTest.java` (unit tests with `@MockBean` for concurrent edge cases).
+  * Add global exception handler `GlobalExceptionHandler.java` (`@RestControllerAdvice`) to centralise error mapping.
+  * Add `actuator` endpoints for health checks (`/actuator/health`).
+  * Review CORS policy: tighten `@CrossOrigin` to the deployed frontend origin before production.
