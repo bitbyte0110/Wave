@@ -107,14 +107,20 @@
   * 5 s polling = 12 req/min — safely within CoinGecko's free-tier rate limit of ~30 req/min.
   * All scheduler failures are caught and logged — a single CoinGecko timeout never kills the scheduler thread.
 
-### Stage 10 — AI Async Risk Audit Service (RabbitMQ Consumer + Gemini)
-* **Goal:** Consume `swap.events` from RabbitMQ, call an LLM (Gemini/OpenRouter), and write the AI remark back to the `transactions` table.
-* **Tasks:**
-  * Create `AuditConsumer.java` annotated with `@RabbitListener(queues = "swap.audit.queue")`.
-  * In `RabbitMQConfig.java`, bind the audit queue to `swap.events` FanoutExchange.
-  * Inject an `HttpClient` (or `WebClient`) to call the Gemini API with transaction context.
-  * On LLM response: execute a soft `UPDATE transactions SET ai_audit_remark = ? WHERE id = ?` via `TransactionRepository`.
-  * Create `NotificationPublisher.java` that publishes a completion event back to a `audit.done` queue.
+## 10. AI Async Risk Audit Service (Completed)
+* **Packages:** `com.wave.terminal.service`, `com.wave.terminal.config`, `com.wave.terminal.repository`
+* **Classes Built / Modified:**
+  * `RabbitMQConfig.java` *(modified)*: Declared `swap.audit.queue` and `audit.done.queue` as durable beans; bound `swap.audit.queue` to `swap.events` FanoutExchange.
+  * `TransactionRepository.java` *(modified)*: Added `@Modifying @Query` method `updateAiRemark(id, remark)` for targeted soft-update of `ai_audit_remark` column.
+  * `AuditConsumer.java` *(new)*: `@RabbitListener(queues = "swap.audit.queue")`. Builds audit prompt → calls Gemini `generateContent` API → soft-updates DB row → triggers `NotificationPublisher`.
+  * `NotificationPublisher.java` *(new)*: Publishes `{ transactionId, userId, remark }` JSON to `audit.done.queue` via default direct exchange.
+* **Config Changes (`application.properties`):** Added `app.gemini.api-key`, `app.gemini.model`, `app.gemini.api-url`.
+* **Key Design Decisions:**
+  * Consumer thread is fully isolated from the HTTP layer — Gemini's 1–3 s latency never blocks a wallet endpoint.
+  * Gemini model: `gemini-2.0-flash` (low-latency, cost-efficient for short audit prompts).
+  * Failures write `"AI audit unavailable: <reason>"` to the remark column — the row is never left `null` for a processed event.
+  * `extractLong()` helper handles both `Integer` and `String` types from the deserialized RabbitMQ map (Jackson deserialises JSON numbers as `Integer` by default).
+  * Stored Key: Saved the Gemini API key in E:\Development\Wave\terminal\.env. Updated Config: Set app.gemini.api-key=${GEMINI_API_KEY} in application.properties with .env auto-import.
 
 ### Stage 11 — Notification Push Service (WebSocket to Frontend)
 * **Goal:** Push the AI audit result down the active WebSocket connection to the correct user's notification bell.
