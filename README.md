@@ -91,7 +91,7 @@ The system decouples high-frequency market data ingestion from transactional dat
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/wave.git
+   git clone https://github.com/bitbyte0110/Wave
    cd wave
    ```
 
