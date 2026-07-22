@@ -39,6 +39,18 @@
 			<artifactId>jackson-databind</artifactId>
 		</dependency>
 
+		<!-- ── RabbitMQ consumer ────────────────────────────────────────── -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+
+		<!-- ── Shared event payload contracts ──────────────────────────── -->
+		<dependency>
+			<groupId>com.wave</groupId>
+			<artifactId>wave-common</artifactId>
+		</dependency>
+
 		<!-- ── Lombok ──────────────────────────────────────────────────── -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swap-engine
+  namespace: wave-terminal
+  labels:
+    app: swap-engine
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: swap-engine
+  template:
+    metadata:
+      labels:
+        app: swap-engine
+    spec:
+      containers:
+        - name: swap-engine
+          image: wave/swap-engine:latest
+          ports:
+            - containerPort: 8084
+          envFrom:
+            - secretRef:
+                name: mysql-secret      # MYSQL_USERNAME, MYSQL_PASSWORD
+            - secretRef:
+                name: rabbitmq-secret   # RABBITMQ_USERNAME, RABBITMQ_PASSWORD
+            - secretRef:
+                name: internal-api-secret # INTERNAL_API_KEY
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://wave-mysql:3306/waveterminal?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
+            - name: SPRING_RABBITMQ_HOST
+              value: "wave-rabbitmq"
+            - name: SPRING_REDIS_HOST
+              value: "wave-redis"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swap-engine
+  namespace: wave-terminal
+spec:
+  selector:
+    app: swap-engine
+  ports:
+    - port: 8084
+      targetPort: 8084

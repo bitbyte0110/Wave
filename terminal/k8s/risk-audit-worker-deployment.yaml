@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: risk-audit-worker
+  namespace: wave-terminal
+  labels:
+    app: risk-audit-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: risk-audit-worker
+  template:
+    metadata:
+      labels:
+        app: risk-audit-worker
+    spec:
+      containers:
+        - name: risk-audit-worker
+          image: wave/risk-audit-worker:latest
+          ports:
+            - containerPort: 8083
+          envFrom:
+            - secretRef:
+                name: gemini-secret     # GEMINI_API_KEY
+            - secretRef:
+                name: rabbitmq-secret   # RABBITMQ_USERNAME, RABBITMQ_PASSWORD
+          # NO MySQL secret — Risk-Audit-Worker never touches MySQL directly
+          env:
+            - name: SPRING_RABBITMQ_HOST
+              value: "wave-rabbitmq"
+            - name: SWAP_ENGINE_BASE_URL
+              value: "http://swap-engine:8084"

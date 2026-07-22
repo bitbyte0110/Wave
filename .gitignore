@@ -75,3 +75,5 @@ yarn-error.log*
 ### General Editors ###
 *.swp
 *.swo
+# Kubernetes local secrets
+terminal/k8s/secrets.yaml
