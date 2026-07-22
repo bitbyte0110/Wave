@@ -12,9 +12,14 @@
 	<artifactId>auth-service</artifactId>
 	<packaging>jar</packaging>
 	<name>Wave Auth Service</name>
-	<description>User registration, login, JWT issuance. No AMQP yet — user.registered event added in Step 3.</description>
+	<description>User registration, login, JWT issuance, and RabbitMQ user.registered event publishing.</description>
 
 	<dependencies>
+		<!-- ── RabbitMQ (AMQP event publisher) ────────────────────────── -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
 		<!-- ── Web (REST) ──────────────────────────────────────────────── -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

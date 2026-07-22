@@ -7,9 +7,8 @@ import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * Temporary: auth-service owns User for JWT principal loading and registration.
- * In Step 3 the direct WalletRepository write is replaced by a user.registered
- * RabbitMQ event, after which this class stays for auth lookups only.
+ * JPA entity representing the users table in auth-service.
+ * Used for authentication lookups and registration persistence.
  */
 @Entity
 @Table(name = "users")

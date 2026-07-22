@@ -6,9 +6,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * Wave Auth Service — entry point.
  *
- * Responsible for: user registration, login, JWT issuance.
- * Temporarily provisions the zero-balance Wallet row directly (cross-domain
- * write resolved in Step 3 via user.registered RabbitMQ event).
+ * Responsible for: user registration, login, JWT issuance, and publishing
+ * the user.registered RabbitMQ event for async wallet provisioning.
  *
  * Component scan scoped to {@code com.wave.auth} only.
  */
