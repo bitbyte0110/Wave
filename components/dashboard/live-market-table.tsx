@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Star } from "lucide-react"
+import { useEffect, useRef, useState, useCallback } from "react"
+import { Star, Wifi, WifiOff } from "lucide-react"
+import { GATEWAY_URL } from "@/lib/auth"
+import { createMarketWebSocket, ConnectionStatus, PriceTickPayload } from "@/lib/market-websocket"
 
 type Coin = {
   id: string
@@ -27,10 +29,10 @@ const initialCoins: Coin[] = [
     name: "Bitcoin",
     symbol: "BTC",
     icon: "B",
-    iconClass: "bg-amber-500/10 text-amber-600",
-    price: 67450,
+    iconClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    price: 68059.49,
     decimals: 2,
-    change24h: 2.15,
+    change24h: 0.41,
     change7d: -4.0,
     marketCap: "$1,318,520,381,250",
     volume: "$25,123,456,789",
@@ -43,10 +45,10 @@ const initialCoins: Coin[] = [
     name: "Ethereum",
     symbol: "ETH",
     icon: "E",
-    iconClass: "bg-indigo-500/10 text-indigo-600",
-    price: 3420.5,
+    iconClass: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+    price: 3403.77,
     decimals: 2,
-    change24h: -1.42,
+    change24h: 0.33,
     change7d: 20.65,
     marketCap: "$411,280,314,891",
     volume: "$15,987,654,321",
@@ -56,13 +58,13 @@ const initialCoins: Coin[] = [
   {
     id: "usdt",
     rank: 3,
-    name: "Tether",
+    name: "Tether / USDC",
     symbol: "USDT",
     icon: "T",
-    iconClass: "bg-emerald-500/10 text-emerald-600",
-    price: 1.0001,
+    iconClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    price: 1.015,
     decimals: 4,
-    change24h: 0.01,
+    change24h: 0.42,
     change7d: 0.0,
     marketCap: "$112,456,789,012",
     volume: "$45,678,901,234",
@@ -75,10 +77,10 @@ const initialCoins: Coin[] = [
     name: "BNB",
     symbol: "BNB",
     icon: "N",
-    iconClass: "bg-yellow-500/10 text-yellow-600",
-    price: 578.4,
+    iconClass: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+    price: 581.01,
     decimals: 2,
-    change24h: -0.45,
+    change24h: 0.18,
     change7d: -3.62,
     marketCap: "$84,123,456,789",
     volume: "$2,123,456,789",
@@ -91,10 +93,10 @@ const initialCoins: Coin[] = [
     name: "XRP",
     symbol: "XRP",
     icon: "X",
-    iconClass: "bg-blue-500/10 text-blue-600",
-    price: 0.5924,
+    iconClass: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    price: 0.5853,
     decimals: 4,
-    change24h: -2.65,
+    change24h: -0.12,
     change7d: -4.61,
     marketCap: "$32,567,890,123",
     volume: "$1,567,890,123",
@@ -113,45 +115,127 @@ function formatPrice(price: number, decimals: number) {
 }
 
 function formatPct(pct: number) {
-  return `${pct >= 0 ? "+" : "-"}${Math.abs(pct).toFixed(2)}%`
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`
 }
 
 export default function LiveMarketTable() {
   const [coins, setCoins] = useState<Coin[]>(initialCoins)
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("All Cryptocurrencies")
   const [flash, setFlash] = useState<Record<string, "up" | "down" | undefined>>({})
+  const [connStatus, setConnStatus] = useState<ConnectionStatus>("CONNECTING")
+
+  // Refs for tracking previous prices and timeouts without extra re-renders
+  const pricesRef = useRef<Record<string, number>>({
+    btc: 68059.49,
+    usdt: 1.015,
+  })
   const flashTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
-  // Simulate real-time websocket price broadcasts
+  // Trigger temporary flash animation for a coin row
+  const triggerFlash = useCallback((coinId: string, direction: "up" | "down") => {
+    setFlash((prev) => ({ ...prev, [coinId]: direction }))
+    if (flashTimeouts.current[coinId]) {
+      clearTimeout(flashTimeouts.current[coinId])
+    }
+    flashTimeouts.current[coinId] = setTimeout(() => {
+      setFlash((prev) => ({ ...prev, [coinId]: undefined }))
+    }, 800)
+  }, [])
+
+  // 1. REST API Initial Seeding
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCoins((prev) => {
-        const idx = Math.floor(Math.random() * prev.length)
-        const target = prev[idx]
-        const changePercent = (Math.random() * 0.2 + 0.05) / 100
-        const isUp = Math.random() > 0.48
-        const diff = target.price * changePercent
-        const newPrice = isUp ? target.price + diff : target.price - diff
-        const newChange = isUp ? Math.random() * 0.4 + 0.1 : -(Math.random() * 0.4 + 0.1)
+    let isMounted = true
 
-        // Trigger flash
-        setFlash((f) => ({ ...f, [target.id]: isUp ? "up" : "down" }))
-        clearTimeout(flashTimeouts.current[target.id])
-        flashTimeouts.current[target.id] = setTimeout(() => {
-          setFlash((f) => ({ ...f, [target.id]: undefined }))
-        }, 1200)
+    async function seedInitialTicks() {
+      const primaryUrl = `${GATEWAY_URL}/api/v1/market/price/tick`
+      const fallbackUrl = "http://localhost:8081/api/v1/market/price/tick"
 
-        const next = [...prev]
-        next[idx] = { ...target, price: newPrice, change24h: newChange }
-        return next
-      })
-    }, 1500)
+      try {
+        let res = await fetch(primaryUrl).catch(() => null)
+        if (!res || !res.ok) {
+          res = await fetch(fallbackUrl).catch(() => null)
+        }
+
+        if (res && res.ok && isMounted) {
+          const tick: PriceTickPayload = await res.json()
+          if (tick.btcUsd && tick.btcUsd > 0) {
+            pricesRef.current.btc = tick.btcUsd
+            pricesRef.current.usdt = tick.usdcUsd || 1.0
+
+            setCoins((prev) =>
+              prev.map((c) => {
+                if (c.id === "btc") {
+                  return { ...c, price: tick.btcUsd, change24h: tick.btc24hPct || c.change24h }
+                }
+                if (c.id === "usdt" && tick.usdcUsd) {
+                  return { ...c, price: tick.usdcUsd }
+                }
+                return c
+              })
+            )
+          }
+        }
+      } catch (err) {
+        console.warn("Initial REST tick seeding failed:", err)
+      }
+    }
+
+    seedInitialTicks()
 
     return () => {
-      clearInterval(interval)
-      Object.values(flashTimeouts.current).forEach(clearTimeout)
+      isMounted = false
     }
   }, [])
+
+  // 2. WebSocket STOMP Live Subscription
+  useEffect(() => {
+    const wsManager = createMarketWebSocket()
+
+    const unsubStatus = wsManager.onStatusChange((status) => {
+      setConnStatus(status)
+    })
+
+    const unsubPrices = wsManager.subscribePrices((tick) => {
+      if (!tick.btcUsd) return
+
+      // Handle BTC update
+      const oldBtc = pricesRef.current.btc || tick.btcUsd
+      if (tick.btcUsd !== oldBtc) {
+        const dir = tick.btcUsd > oldBtc ? "up" : "down"
+        triggerFlash("btc", dir)
+        pricesRef.current.btc = tick.btcUsd
+      }
+
+      // Handle USDC/USDT update
+      if (tick.usdcUsd) {
+        const oldUsdc = pricesRef.current.usdt || tick.usdcUsd
+        if (tick.usdcUsd !== oldUsdc) {
+          const dir = tick.usdcUsd > oldUsdc ? "up" : "down"
+          triggerFlash("usdt", dir)
+          pricesRef.current.usdt = tick.usdcUsd
+        }
+      }
+
+      setCoins((prev) =>
+        prev.map((c) => {
+          if (c.id === "btc") {
+            return { ...c, price: tick.btcUsd, change24h: tick.btc24hPct ?? c.change24h }
+          }
+          if (c.id === "usdt" && tick.usdcUsd) {
+            return { ...c, price: tick.usdcUsd }
+          }
+          return c
+        })
+      )
+    })
+
+    return () => {
+      unsubPrices()
+      unsubStatus()
+      wsManager.disconnect()
+      Object.values(flashTimeouts.current).forEach(clearTimeout)
+    }
+  }, [triggerFlash])
 
   const toggleFavorite = (id: string) => {
     setCoins((prev) => prev.map((c) => (c.id === id ? { ...c, favorite: !c.favorite } : c)))
@@ -174,7 +258,7 @@ export default function LiveMarketTable() {
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
-      {/* Tabs header */}
+      {/* Header bar with filters & live connection indicator */}
       <div className="border-b border-border px-4 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-wrap items-center gap-2">
           {tabs.map((tab) => (
@@ -191,9 +275,21 @@ export default function LiveMarketTable() {
             </button>
           ))}
         </div>
-        <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider whitespace-nowrap">
-          Live Prices
-        </span>
+
+        {/* Live Prices Status Badge */}
+        <div className="flex items-center space-x-2">
+          {connStatus === "CONNECTED" ? (
+            <span className="inline-flex items-center space-x-1.5 text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+              <Wifi className="h-3 w-3 animate-pulse" />
+              <span>LIVE PRICES</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center space-x-1.5 text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-3 py-1 rounded-full font-bold uppercase tracking-wider animate-pulse">
+              <WifiOff className="h-3 w-3" />
+              <span>RECONNECTING...</span>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -241,22 +337,26 @@ export default function LiveMarketTable() {
                   </div>
                 </td>
                 <td
-                  className={`py-4 px-6 text-right font-bold tracking-tight ${
-                    flash[coin.id] === "up" ? "price-up" : flash[coin.id] === "down" ? "price-down" : ""
+                  className={`py-4 px-6 text-right font-bold tracking-tight rounded transition-all duration-300 ${
+                    flash[coin.id] === "up"
+                      ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-extrabold"
+                      : flash[coin.id] === "down"
+                      ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold"
+                      : ""
                   }`}
                 >
                   {formatPrice(coin.price, coin.decimals)}
                 </td>
                 <td
                   className={`py-4 px-6 text-right font-semibold ${
-                    coin.change24h >= 0 ? "text-emerald-600" : "text-rose-600"
+                    coin.change24h >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                   }`}
                 >
                   {formatPct(coin.change24h)}
                 </td>
                 <td
                   className={`py-4 px-6 text-right font-semibold ${
-                    coin.change7d >= 0 ? "text-emerald-600" : "text-rose-600"
+                    coin.change7d >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                   }`}
                 >
                   {formatPct(coin.change7d)}
