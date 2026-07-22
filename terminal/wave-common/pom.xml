@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>com.wave</groupId>
+		<artifactId>terminal</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+	</parent>
+
+	<artifactId>wave-common</artifactId>
+	<!-- Plain JAR — NOT a Spring Boot fat-jar. Other modules depend on this. -->
+	<packaging>jar</packaging>
+	<name>Wave Common — Shared DTOs and Event Payloads</name>
+	<description>
+		Plain Java records for shared API response shapes and RabbitMQ event payloads.
+		No Spring beans, no JPA annotations. This module may be depended on by any
+		Wave Terminal service module without pulling in infrastructure dependencies.
+	</description>
+
+	<dependencies>
+		<!-- Jackson annotations for JSON field naming if needed -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+	</dependencies>
+
+	<!-- No spring-boot-maven-plugin: this is a plain library JAR, not a Boot app. -->
+
+</project>
