@@ -3,6 +3,7 @@ package com.wave.terminal.service;
 import com.wave.terminal.entity.Transaction;
 import com.wave.terminal.entity.TransactionType;
 import com.wave.terminal.entity.Wallet;
+import com.wave.terminal.handler.AssetPairRegistry;
 import com.wave.terminal.repository.TransactionRepository;
 import com.wave.terminal.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,13 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
     private final RabbitTemplate rabbitTemplate;
+    private final AssetPairRegistry assetPairRegistry;
+
+    @Transactional(readOnly = true)
+    public Wallet getBalance(Long userId) {
+        return walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("No wallet found for user ID: " + userId));
+    }
 
     @Transactional
     public Wallet simulateDeposit(Long userId, String asset, BigDecimal amount) {
@@ -88,22 +96,8 @@ public class WalletService {
         Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new RuntimeException("Wallet context missing for user ID: " + userId));
 
-        // Enforce dual-asset execution protection calculations
-        if (fromAsset.equalsIgnoreCase("USDC") && toAsset.equalsIgnoreCase("BTC")) {
-            if (wallet.getUsdcBalance().compareTo(fromAmount) < 0) {
-                throw new RuntimeException("Insufficient core balance parameters to execute immediate asset swap");
-            }
-            wallet.setUsdcBalance(wallet.getUsdcBalance().subtract(fromAmount));
-            wallet.setBtcBalance(wallet.getBtcBalance().add(toAmount));
-        } else if (fromAsset.equalsIgnoreCase("BTC") && toAsset.equalsIgnoreCase("USDC")) {
-            if (wallet.getBtcBalance().compareTo(fromAmount) < 0) {
-                throw new RuntimeException("Insufficient core balance parameters to execute immediate asset swap");
-            }
-            wallet.setBtcBalance(wallet.getBtcBalance().subtract(fromAmount));
-            wallet.setUsdcBalance(wallet.getUsdcBalance().add(toAmount));
-        } else {
-            throw new IllegalArgumentException("Invalid internal conversion pathway context mapping parameters");
-        }
+        // Delegate swap calculation to the matching strategy handler
+        assetPairRegistry.executeSwap(wallet, fromAsset, toAsset, fromAmount, toAmount);
 
         walletRepository.save(wallet);
 

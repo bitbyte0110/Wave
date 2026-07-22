@@ -5,7 +5,6 @@ import com.wave.terminal.controller.dto.DepositRequest;
 import com.wave.terminal.controller.dto.SwapRequest;
 import com.wave.terminal.controller.dto.WithdrawRequest;
 import com.wave.terminal.entity.Wallet;
-import com.wave.terminal.repository.WalletRepository;
 import com.wave.terminal.service.IdempotencyService;
 import com.wave.terminal.service.WalletService;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +35,6 @@ import java.util.UUID;
 public class WalletController {
 
     private final WalletService walletService;
-    private final WalletRepository walletRepository;
     private final IdempotencyService idempotencyService;
 
     // -------------------------------------------------------------------------
@@ -183,8 +181,7 @@ public class WalletController {
     public ResponseEntity<?> getBalance(@PathVariable Long userId) {
         log.info("BALANCE QUERY ▶ userId={}", userId);
         try {
-            Wallet wallet = walletRepository.findByUserId(userId)
-                    .orElseThrow(() -> new RuntimeException("No wallet found for user ID: " + userId));
+            Wallet wallet = walletService.getBalance(userId);
             return ResponseEntity.ok(toBalanceResponse(wallet));
         } catch (RuntimeException ex) {
             log.warn("BALANCE QUERY FAILED – {}", ex.getMessage());

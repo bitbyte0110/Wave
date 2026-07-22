@@ -1,6 +1,9 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# System / OS files
+.DS_Store
+Thumbs.db
 
 # Documentation & specific local files
+HELP.md
 README copy.md
 prd.md
 PROJECT_STATE.md
@@ -9,41 +12,66 @@ PROJECT_STATE.md
 .env*
 !.env.example
 
-# Dependencies
+# Node dependencies
 /node_modules
 /.pnpm-store
 
-# Next.js & Build outputs
+# Java / Maven build outputs
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Node / Next.js build outputs
 /.next/
 /out/
-/build
-/dist
+/build/
+/dist/
+!**/src/main/**/build/
+!**/src/test/**/build/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts~
 
 # Debug logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-*.log
-
-# Vercel & Deployment
-.vercel
-
-# TypeScript & Cache
-*.tsbuildinfo
-next-env.d.ts~
-.turbo/
-
-# IDE / Editor configuration
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# System / OS files
-.DS_Store
-Thumbs.db
 
 # Testing & Coverage
 /coverage
 /.nyc_output
+
+# Vercel & Deployment
+.vercel
+
+# IDE / Editor configuration
+### VS Code ###
+.vscode/
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+
+### General Editors ###
+*.swp
+*.swo
