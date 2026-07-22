@@ -1,3 +1,4 @@
+
 package com.wave.gateway.filter;
 
 import io.jsonwebtoken.Jwts;
@@ -26,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 class JwtAuthenticationGlobalFilterTest {
 
-    private static final String SECRET_BASE64 = "V2F2ZVRlcm1pbmFsU3VwZXJTZWNyZXRLZXkyMDI2X1NlY3VyZQ==";
+    private static final String SECRET_BASE64 = "V2F2ZVRlcm1pbmFsU3VwZXJTZWNyZXRLZXkyMDI2X1NlY3VyZV9KV1RfVG9rZW5fS2V5XzI1NkJpdHM=";
     private JwtAuthenticationGlobalFilter filter;
     private GatewayFilterChain chain;
 

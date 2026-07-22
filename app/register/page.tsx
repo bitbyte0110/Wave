@@ -1,16 +1,16 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Eye, EyeOff, Check, X, ArrowLeft } from "lucide-react"
+import { Eye, EyeOff, Check, X, ArrowLeft, User, Mail, Lock, ShieldAlert, Sparkles } from "lucide-react"
+import { postAuthApi, setAuthSession } from "@/lib/auth"
 
-export default function RegisterPage() {
+function RegisterFormContent() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    fullName: "",
+    username: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -19,22 +19,19 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [apiError, setApiError] = useState("")
   const [agreeToTerms, setAgreeToTerms] = useState(false)
 
-  // Password strength requirements
+  // Password requirements
   const passwordRequirements = [
-    { id: "length", label: "At least 8 characters", test: (pass: string) => pass.length >= 8 },
-    { id: "uppercase", label: "At least 1 uppercase letter", test: (pass: string) => /[A-Z]/.test(pass) },
-    { id: "lowercase", label: "At least 1 lowercase letter", test: (pass: string) => /[a-z]/.test(pass) },
-    { id: "number", label: "At least 1 number", test: (pass: string) => /[0-9]/.test(pass) },
-    { id: "special", label: "At least 1 special character", test: (pass: string) => /[^A-Za-z0-9]/.test(pass) },
+    { id: "length", label: "At least 6 characters", test: (pass: string) => pass.length >= 6 },
+    { id: "match", label: "Passwords match", test: (pass: string) => pass.length > 0 && pass === formData.confirmPassword },
   ]
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
 
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }))
     }
@@ -43,44 +40,37 @@ export default function RegisterPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // Validate full name
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = "Full name is required"
+    if (!formData.username.trim()) {
+      newErrors.username = "Username is required"
     }
 
-    // Validate email
     if (!formData.email) {
       newErrors.email = "Email is required"
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid"
+      newErrors.email = "Invalid email format"
     }
 
-    // Validate password
     if (!formData.password) {
       newErrors.password = "Password is required"
-    } else {
-      const failedRequirements = passwordRequirements.filter((req) => !req.test(formData.password))
-      if (failedRequirements.length > 0) {
-        newErrors.password = "Password doesn't meet requirements"
-      }
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters"
     }
 
-    // Validate confirm password
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match"
     }
 
-    // Validate terms agreement
     if (!agreeToTerms) {
-      newErrors.terms = "You must agree to the terms and conditions"
+      newErrors.terms = "You must accept the terms of service"
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setApiError("")
 
     if (!validateForm()) {
       return
@@ -88,237 +78,248 @@ export default function RegisterPage() {
 
     setIsLoading(true)
 
-    // Simulate API call with timeout
-    setTimeout(() => {
-      // In a real app, you would send the data to your API
-      console.log("Registration data:", formData)
+    try {
+      const response = await postAuthApi("/api/v1/auth/register", {
+        email: formData.email,
+        username: formData.username,
+        password: formData.password,
+      })
 
-      // Store registration in session storage for demo purposes
-      sessionStorage.setItem("registeredEmail", formData.email)
+      const data = await response.json()
 
-      // Redirect to login with success message
-      router.push("/login?registered=true")
-    }, 1500)
+      if (!response.ok) {
+        throw new Error(data.error || "Registration failed. Please try again.")
+      }
+
+      // Automatically log in and persist session
+      setAuthSession({
+        token: data.token,
+        userId: data.userId,
+        username: data.username,
+        email: data.email,
+      })
+
+      router.push("/dashboard")
+    } catch (err: any) {
+      setApiError(err.message || "Could not connect to backend Auth Service.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
-        <div className="text-center">
-          <div className="flex justify-center">
-            <div className="bg-emerald-100 rounded-full p-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-8 w-8 text-emerald-600"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z"
-                  clipRule="evenodd"
-                />
-              </svg>
+    <div className="max-w-md w-full space-y-6 p-8 bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden">
+      {/* Ambient background blur */}
+      <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="text-center relative z-10">
+        <div className="flex justify-center mb-3">
+          <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center">
+            <div className="h-full w-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-emerald-400" />
             </div>
           </div>
-          <h2 className="mt-4 text-3xl font-bold text-gray-900">Create an account</h2>
-          <p className="mt-2 text-sm text-gray-600">Join our crypto trading platform</p>
         </div>
+        <h2 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+          Create Account
+        </h2>
+        <p className="mt-1 text-xs text-slate-400">Provision wallet & credentials via Wave Gateway</p>
+      </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
-            {/* Full Name Field */}
-            <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
+      {apiError && (
+        <div className="bg-rose-950/60 border border-rose-500/40 p-3.5 rounded-xl text-xs text-rose-300 flex items-start space-x-2.5">
+          <ShieldAlert className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+          <div>{apiError}</div>
+        </div>
+      )}
+
+      <form className="space-y-4 relative z-10" onSubmit={handleSubmit} id="register-form">
+        <div className="space-y-3.5">
+          {/* Username Field */}
+          <div>
+            <label htmlFor="register-username" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+              Username
+            </label>
+            <div className="relative">
+              <User className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-500" />
               <input
-                id="fullName"
-                name="fullName"
+                id="register-username"
+                name="username"
                 type="text"
-                autoComplete="name"
+                autoComplete="username"
                 required
-                value={formData.fullName}
+                value={formData.username}
                 onChange={handleChange}
-                className={`appearance-none relative block w-full px-3 py-2 border ${
-                  errors.fullName ? "border-red-300" : "border-gray-300"
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 focus:z-10 sm:text-sm`}
-                placeholder="John Doe"
+                className={`w-full pl-10 pr-4 py-2 bg-slate-950/60 border ${
+                  errors.username ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
+                } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
+                placeholder="alex_trader"
               />
-              {errors.fullName && <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>}
             </div>
+            {errors.username && <p className="mt-1 text-xs text-rose-400">{errors.username}</p>}
+          </div>
 
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email address
-              </label>
+          {/* Email Field */}
+          <div>
+            <label htmlFor="register-email" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+              Email Address
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-500" />
               <input
-                id="email"
+                id="register-email"
                 name="email"
                 type="email"
                 autoComplete="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className={`appearance-none relative block w-full px-3 py-2 border ${
-                  errors.email ? "border-red-300" : "border-gray-300"
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 focus:z-10 sm:text-sm`}
-                placeholder="you@example.com"
+                className={`w-full pl-10 pr-4 py-2 bg-slate-950/60 border ${
+                  errors.email ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
+                } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
+                placeholder="alex@example.com"
               />
-              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
             </div>
-
-            {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  className={`appearance-none relative block w-full px-3 py-2 border ${
-                    errors.password ? "border-red-300" : "border-gray-300"
-                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 focus:z-10 sm:text-sm pr-10`}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
-                </button>
-              </div>
-              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
-            </div>
-
-            {/* Password Requirements */}
-            <div className="space-y-2">
-              <p className="text-xs text-gray-500">Password requirements:</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {passwordRequirements.map((req) => (
-                  <div
-                    key={req.id}
-                    className={`flex items-center text-xs ${
-                      req.test(formData.password) ? "text-emerald-600" : "text-gray-500"
-                    }`}
-                  >
-                    {req.test(formData.password) ? <Check className="h-3 w-3 mr-1" /> : <X className="h-3 w-3 mr-1" />}
-                    {req.label}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Confirm Password Field */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  required
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className={`appearance-none relative block w-full px-3 py-2 border ${
-                    errors.confirmPassword ? "border-red-300" : "border-gray-300"
-                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 focus:z-10 sm:text-sm pr-10`}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
-                </button>
-              </div>
-              {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
-            </div>
-
-            {/* Terms and Conditions */}
-            <div className="flex items-start">
-              <div className="flex items-center h-5">
-                <input
-                  id="terms"
-                  name="terms"
-                  type="checkbox"
-                  checked={agreeToTerms}
-                  onChange={() => setAgreeToTerms(!agreeToTerms)}
-                  className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                />
-              </div>
-              <div className="ml-3 text-sm">
-                <label htmlFor="terms" className="font-medium text-gray-700">
-                  I agree to the{" "}
-                  <a href="#" className="text-emerald-600 hover:text-emerald-500">
-                    Terms and Conditions
-                  </a>{" "}
-                  and{" "}
-                  <a href="#" className="text-emerald-600 hover:text-emerald-500">
-                    Privacy Policy
-                  </a>
-                </label>
-              </div>
-            </div>
-            {errors.terms && <p className="mt-1 text-sm text-red-600">{errors.terms}</p>}
+            {errors.email && <p className="mt-1 text-xs text-rose-400">{errors.email}</p>}
           </div>
 
+          {/* Password Field */}
           <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 ${
-                isLoading ? "opacity-70 cursor-not-allowed" : ""
-              }`}
-            >
-              {isLoading ? (
-                <svg
-                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-              ) : (
-                "Create Account"
-              )}
-            </button>
+            <label htmlFor="register-password" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-500" />
+              <input
+                id="register-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                value={formData.password}
+                onChange={handleChange}
+                className={`w-full pl-10 pr-10 py-2 bg-slate-950/60 border ${
+                  errors.password ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
+                } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                id="toggle-register-password-visibility"
+                className="absolute right-3.5 top-2.5 text-slate-500 hover:text-slate-300 transition-colors"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {errors.password && <p className="mt-1 text-xs text-rose-400">{errors.password}</p>}
           </div>
-        </form>
 
-        <div className="text-center mt-4">
-          <Link href="/login" className="inline-flex items-center font-medium text-emerald-600 hover:text-emerald-500">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to login
-          </Link>
+          {/* Confirm Password Field */}
+          <div>
+            <label htmlFor="register-confirm-password" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+              Confirm Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-500" />
+              <input
+                id="register-confirm-password"
+                name="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className={`w-full pl-10 pr-10 py-2 bg-slate-950/60 border ${
+                  errors.confirmPassword ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
+                } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                id="toggle-confirm-password-visibility"
+                className="absolute right-3.5 top-2.5 text-slate-500 hover:text-slate-300 transition-colors"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {errors.confirmPassword && <p className="mt-1 text-xs text-rose-400">{errors.confirmPassword}</p>}
+          </div>
+
+          {/* Validation Checklist */}
+          <div className="space-y-1 pt-1">
+            {passwordRequirements.map((req) => (
+              <div key={req.id} className="flex items-center text-xs text-slate-400">
+                {req.test(formData.password) ? (
+                  <Check className="h-3 w-3 text-emerald-400 mr-1.5 shrink-0" />
+                ) : (
+                  <X className="h-3 w-3 text-slate-600 mr-1.5 shrink-0" />
+                )}
+                <span className={req.test(formData.password) ? "text-emerald-400" : "text-slate-500"}>{req.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Terms Agreement */}
+          <div className="pt-1">
+            <label className="flex items-start space-x-2 cursor-pointer text-xs text-slate-400">
+              <input
+                id="register-terms-checkbox"
+                type="checkbox"
+                checked={agreeToTerms}
+                onChange={() => setAgreeToTerms(!agreeToTerms)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-emerald-500"
+              />
+              <span>
+                I agree to the{" "}
+                <span className="text-emerald-400 underline cursor-pointer">Terms of Service</span> and{" "}
+                <span className="text-emerald-400 underline cursor-pointer">Privacy Policy</span>
+              </span>
+            </label>
+            {errors.terms && <p className="mt-1 text-xs text-rose-400">{errors.terms}</p>}
+          </div>
         </div>
+
+        <button
+          type="submit"
+          id="register-submit-btn"
+          disabled={isLoading}
+          className={`w-full flex justify-center items-center py-2.5 px-4 rounded-xl font-semibold text-sm text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 shadow-lg shadow-emerald-500/25 transition-all duration-200 ${
+            isLoading ? "opacity-75 cursor-not-allowed" : "hover:scale-[1.01] active:scale-[0.99]"
+          }`}
+        >
+          {isLoading ? (
+            <span className="flex items-center space-x-2">
+              <svg className="animate-spin h-4 w-4 text-slate-950" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span>Creating account...</span>
+            </span>
+          ) : (
+            <span>Create Account</span>
+          )}
+        </button>
+      </form>
+
+      <div className="text-center pt-2 text-xs text-slate-400 relative z-10">
+        <Link href="/login" id="back-to-login-link" className="inline-flex items-center font-medium text-emerald-400 hover:text-emerald-300">
+          <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+          Back to login
+        </Link>
       </div>
+    </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-4 py-12 text-slate-100">
+      <Suspense fallback={<div className="text-center text-slate-400 text-sm">Loading registration...</div>}>
+        <RegisterFormContent />
+      </Suspense>
     </div>
   )
 }

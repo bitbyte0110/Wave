@@ -8,6 +8,7 @@ import { Search, Bell } from "lucide-react"
 import SideNavigation from "@/components/side-navigation"
 import AccountDropdown from "@/components/account-dropdown"
 import MobileSidebarToggle from "@/components/mobile-sidebar-toggle"
+import { isAuthenticated } from "@/lib/auth"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -22,10 +23,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Check if user is logged in
   useEffect(() => {
-    // Check for login status
-    const isLoggedIn = sessionStorage.getItem("isLoggedIn") === "true" || document.cookie.includes("isLoggedIn=true")
+    // Check for login status or JWT token
+    const loggedIn = isAuthenticated() || sessionStorage.getItem("isLoggedIn") === "true" || document.cookie.includes("isLoggedIn=true")
 
-    if (!isLoggedIn) {
+    if (!loggedIn) {
       router.push("/login")
     } else {
       setIsLoading(false)
