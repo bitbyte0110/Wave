@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Eye, EyeOff, Check, X, ArrowLeft, User, Mail, Lock, ShieldAlert, Sparkles } from "lucide-react"
+import { Eye, EyeOff, Check, X, ArrowLeft, User, Mail, Lock, ShieldAlert, Waves } from "lucide-react"
 import { postAuthApi, setAuthSession } from "@/lib/auth"
 
 function RegisterFormContent() {
@@ -117,14 +117,14 @@ function RegisterFormContent() {
         <div className="flex justify-center mb-3">
           <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center">
             <div className="h-full w-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-emerald-400" />
+              <Waves className="h-6 w-6 text-emerald-400" />
             </div>
           </div>
         </div>
         <h2 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
           Create Account
         </h2>
-        <p className="mt-1 text-xs text-slate-400">Provision wallet & credentials via Wave Gateway</p>
+        <p className="mt-1 text-xs text-slate-400">Enter your details to create a new account</p>
       </div>
 
       {apiError && (

@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Eye, EyeOff, ArrowRight, UserPlus, Lock, Mail, ShieldAlert, Sparkles } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, UserPlus, Lock, Mail, ShieldAlert, Waves } from "lucide-react"
 import { postAuthApi, setAuthSession } from "@/lib/auth"
 
 function LoginFormContent() {
@@ -17,12 +17,6 @@ function LoginFormContent() {
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
-
-  // Demo credentials helper
-  const demoCredentials = {
-    email: "demo@example.com",
-    password: "password123",
-  }
 
   // Check for registration success message from redirect
   useEffect(() => {
@@ -82,11 +76,6 @@ function LoginFormContent() {
     }
   }
 
-  const handleDemoFill = () => {
-    setEmail(demoCredentials.email)
-    setPassword(demoCredentials.password)
-  }
-
   return (
     <div className="max-w-md w-full space-y-8 p-8 bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden">
       {/* Glow backdrop effect */}
@@ -97,14 +86,14 @@ function LoginFormContent() {
         <div className="flex justify-center mb-4">
           <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center">
             <div className="h-full w-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-              <Sparkles className="h-7 w-7 text-emerald-400" />
+              <Waves className="h-7 w-7 text-emerald-400" />
             </div>
           </div>
         </div>
         <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-          Wave Terminal
+          Wave
         </h2>
-        <p className="mt-2 text-sm text-slate-400">Sign in via Edge API Gateway</p>
+        <p className="mt-2 text-sm text-slate-400">Sign in to your Wave account</p>
       </div>
 
       {successMessage && (
@@ -209,23 +198,6 @@ function LoginFormContent() {
           )}
         </button>
       </form>
-
-      <div className="mt-6 pt-6 border-t border-slate-800/80 relative z-10">
-        <div className="bg-slate-950/40 p-3.5 rounded-xl border border-slate-800/60 flex items-center justify-between text-xs">
-          <div>
-            <p className="font-medium text-slate-300">Quick Demo Fill</p>
-            <p className="text-slate-500">{demoCredentials.email}</p>
-          </div>
-          <button
-            type="button"
-            id="fill-demo-credentials-btn"
-            onClick={handleDemoFill}
-            className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-medium transition-colors"
-          >
-            Fill Demo
-          </button>
-        </div>
-      </div>
 
       <div className="text-center mt-4 text-xs text-slate-400 relative z-10">
         Don't have an account?{" "}

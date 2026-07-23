@@ -81,7 +81,7 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
                 isActive("/swap") ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <ArrowLeftRight className="h-5 w-5 mr-3 transition-transform duration-200 group-hover:scale-110 group-active:scale-95 text-emerald-500" />
+              <ArrowLeftRight className="h-5 w-5 mr-3 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
               <span className="transition-all duration-200 group-hover:translate-x-1 group-active:translate-x-0">
                 Swap
               </span>
@@ -116,7 +116,7 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
           rel="noopener noreferrer"
           className="text-sm text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center justify-center"
         >
-          <span className="font-medium">@Wave Terminal</span>
+          <span className="font-medium">@Wave</span>
         </a>
       </div>
     </div>

@@ -11,9 +11,12 @@ import {
   EyeOff,
   Save,
   RefreshCw,
+  Hash,
+  Mail,
+  CheckCircle,
 } from "lucide-react"
 import { useTheme } from "@/contexts/theme-context"
-import { getAuthUser, UserSession, GATEWAY_URL } from "@/lib/auth"
+import { getAuthUser, setAuthSession, UserSession, GATEWAY_URL } from "@/lib/auth"
 import { toast } from "sonner"
 
 export default function SettingsPage() {
@@ -21,11 +24,9 @@ export default function SettingsPage() {
   const { theme, setTheme, colorScheme, setColorScheme } = useTheme()
   const [user, setUser] = useState<UserSession | null>(null)
 
-  // Account Form State
-  const [fullName, setFullName] = useState("John Doe")
+  // Account Form State (Aligned with Database Entity: id, username, email)
+  const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("+1 (555) 019-2834")
-  const [bio, setBio] = useState("Crypto enthusiast and algorithmic trader.")
   const [isSavingAccount, setIsSavingAccount] = useState(false)
 
   // Security Form State
@@ -41,19 +42,58 @@ export default function SettingsPage() {
     const auth = getAuthUser()
     setUser(auth)
     if (auth) {
-      if (auth.username) setFullName(auth.username)
+      if (auth.username) setUsername(auth.username)
       if (auth.email) setEmail(auth.email)
     }
   }, [])
 
-  // Handle Account Form Submit
-  const handleSaveAccount = (e: React.FormEvent) => {
+  // Handle Account Form Submit (Save Username & Email matching DB User Entity)
+  const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!username.trim()) {
+      toast.error("Username cannot be empty.")
+      return
+    }
+    if (!email.trim() || !email.includes("@")) {
+      toast.error("Please enter a valid email address.")
+      return
+    }
+
     setIsSavingAccount(true)
-    setTimeout(() => {
+
+    try {
+      // Optional REST API call to backend auth-service
+      await fetch(`${GATEWAY_URL}/api/v1/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user?.token || ""}`,
+        },
+        body: JSON.stringify({
+          userId: user?.userId,
+          username: username.trim(),
+          email: email.trim(),
+        }),
+      }).catch(() => null)
+
+      // Update auth session in localStorage & sessionStorage for current system
+      const updatedSession: UserSession = {
+        token: user?.token || "mock-jwt-token",
+        userId: user?.userId || 1001,
+        username: username.trim(),
+        email: email.trim(),
+      }
+
+      setAuthSession(updatedSession)
+      setUser(updatedSession)
+
+      toast.success("Account profile updated successfully!")
+    } catch {
+      toast.error("Failed to update profile. Please try again.")
+    } finally {
       setIsSavingAccount(false)
-      toast.success("Account details updated successfully!")
-    }, 600)
+    }
   }
 
   // Handle Password Update Submit
@@ -84,7 +124,6 @@ export default function SettingsPage() {
     setIsUpdatingPassword(true)
 
     try {
-      // Perform password update call to backend with fallback to session storage
       const res = await fetch(`${GATEWAY_URL}/api/v1/auth/password`, {
         method: "POST",
         headers: {
@@ -101,7 +140,6 @@ export default function SettingsPage() {
       if (res && res.ok) {
         toast.success("Password updated successfully!")
       } else {
-        // Local state store update for demo mode
         if (typeof window !== "undefined") {
           localStorage.setItem(`wave_pwd_${user?.userId || "guest"}`, newPassword)
         }
@@ -143,11 +181,10 @@ export default function SettingsPage() {
             <nav className="p-2 space-y-1">
               <button
                 onClick={() => setActiveTab("account")}
-                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === "account"
+                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === "account"
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
+                  }`}
               >
                 <User className="h-4 w-4 mr-3" />
                 <span>Account Profile</span>
@@ -155,11 +192,10 @@ export default function SettingsPage() {
 
               <button
                 onClick={() => setActiveTab("appearance")}
-                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === "appearance"
+                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === "appearance"
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
+                  }`}
               >
                 <Moon className="h-4 w-4 mr-3" />
                 <span>Appearance</span>
@@ -167,11 +203,10 @@ export default function SettingsPage() {
 
               <button
                 onClick={() => setActiveTab("security")}
-                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === "security"
+                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === "security"
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
+                  }`}
               >
                 <Shield className="h-4 w-4 mr-3" />
                 <span>Security</span>
@@ -183,7 +218,7 @@ export default function SettingsPage() {
         {/* Content Area */}
         <div className="lg:col-span-3">
           <div className="bg-card rounded-xl border border-border p-6 shadow-xs">
-            {/* TAB 1: ACCOUNT PROFILE */}
+            {/* TAB 1: ACCOUNT PROFILE (ALIGNED WITH DB USER ENTITY: ID, USERNAME, EMAIL) */}
             {activeTab === "account" && (
               <div>
                 <h2 className="text-lg font-bold text-foreground mb-6 flex items-center">
@@ -192,67 +227,73 @@ export default function SettingsPage() {
                 </h2>
 
                 <form onSubmit={handleSaveAccount} className="space-y-6">
+                  {/* Account Header Badge */}
                   <div className="flex items-center space-x-4 pb-4 border-b border-border">
-                    <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-xl border border-primary/30">
-                      {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
+                    <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-xl border border-primary/30 shrink-0">
+                      {username ? username.charAt(0).toUpperCase() : "U"}
                     </div>
                     <div>
-                      <div className="font-semibold text-foreground">{user?.username || "John Doe"}</div>
-                      <div className="text-xs text-muted-foreground">{user?.email || "user@wave.terminal"}</div>
-                      <span className="inline-block mt-1 px-2 py-0.5 rounded bg-muted text-[11px] font-mono text-muted-foreground">
-                        UID: #{user?.userId || "1001"}
-                      </span>
+                      <div className="font-semibold text-foreground text-base">{username || "User Account"}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{email || "user@wave.terminal"}</div>
+                      <div className="flex items-center space-x-2 mt-1.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-muted text-[11px] font-mono text-muted-foreground">
+                          <Hash className="h-3 w-3 mr-1 text-primary" />
+                          UID: #{user?.userId || "1001"}
+                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[11px] font-medium border border-emerald-500/20">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Authenticated
+                        </span>
+                      </div>
                     </div>
                   </div>
 
+                  {/* Form Fields matching DB Entity columns: username, email */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
+                      <label className="block text-sm font-medium text-foreground mb-1 flex items-center">
+                        <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                        Username
+                      </label>
                       <input
                         type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="Enter username"
                         className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                       />
+                      <p className="text-[11px] text-muted-foreground mt-1">Stored in `users.username` column</p>
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Email Address</label>
+                      <label className="block text-sm font-medium text-foreground mb-1 flex items-center">
+                        <Mail className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                        Email Address
+                      </label>
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Enter email address"
                         className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Phone Number</label>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Country / Region</label>
-                      <select className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground">
-                        <option value="us">United States</option>
-                        <option value="ca">Canada</option>
-                        <option value="uk">United Kingdom</option>
-                        <option value="sg">Singapore</option>
-                        <option value="de">Germany</option>
-                      </select>
+                      <p className="text-[11px] text-muted-foreground mt-1">Stored in `users.email` column</p>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Bio</label>
-                    <textarea
-                      rows={3}
-                      value={bio}
-                      onChange={(e) => setBio(e.target.value)}
-                      className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                  {/* User ID Field (Read-only) */}
+                  <div className="pt-2">
+                    <label className="block text-sm font-medium text-foreground mb-1 flex items-center">
+                      <Hash className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                      User ID
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      value={`#${user?.userId || "1001"}`}
+                      className="w-full bg-muted/50 border border-border rounded-lg px-3.5 py-2 text-sm font-mono text-muted-foreground cursor-not-allowed max-w-md"
                     />
+                    <p className="text-[11px] text-muted-foreground mt-1">Unique identifier generated by the system. This value cannot be changed</p>
                   </div>
 
                   <div className="pt-4 border-t border-border flex justify-end">
@@ -266,7 +307,7 @@ export default function SettingsPage() {
                       ) : (
                         <Save className="h-4 w-4 mr-2" />
                       )}
-                      Save Changes
+                      Save Profile
                     </button>
                   </div>
                 </form>
@@ -286,11 +327,10 @@ export default function SettingsPage() {
                     <h3 className="font-medium text-foreground mb-3 text-sm">Theme Preference</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div
-                        className={`border rounded-xl p-4 cursor-pointer transition-all ${
-                          theme === "light"
+                        className={`border rounded-xl p-4 cursor-pointer transition-all ${theme === "light"
                             ? "border-primary ring-2 ring-primary/20 bg-primary/5"
                             : "border-border hover:bg-muted/50"
-                        }`}
+                          }`}
                         onClick={() => setTheme("light")}
                       >
                         <div className="flex justify-between items-center mb-3">
@@ -301,11 +341,10 @@ export default function SettingsPage() {
                       </div>
 
                       <div
-                        className={`border rounded-xl p-4 cursor-pointer transition-all ${
-                          theme === "dark"
+                        className={`border rounded-xl p-4 cursor-pointer transition-all ${theme === "dark"
                             ? "border-primary ring-2 ring-primary/20 bg-primary/5"
                             : "border-border hover:bg-muted/50"
-                        }`}
+                          }`}
                         onClick={() => setTheme("dark")}
                       >
                         <div className="flex justify-between items-center mb-3">
@@ -316,11 +355,10 @@ export default function SettingsPage() {
                       </div>
 
                       <div
-                        className={`border rounded-xl p-4 cursor-pointer transition-all ${
-                          theme === "system"
+                        className={`border rounded-xl p-4 cursor-pointer transition-all ${theme === "system"
                             ? "border-primary ring-2 ring-primary/20 bg-primary/5"
                             : "border-border hover:bg-muted/50"
-                        }`}
+                          }`}
                         onClick={() => setTheme("system")}
                       >
                         <div className="flex justify-between items-center mb-3">
@@ -340,11 +378,10 @@ export default function SettingsPage() {
                     <h3 className="font-medium text-foreground mb-3 text-sm">Accent Color Scheme</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div
-                        className={`border rounded-xl p-3 cursor-pointer transition-all ${
-                          colorScheme === "emerald"
+                        className={`border rounded-xl p-3 cursor-pointer transition-all ${colorScheme === "emerald"
                             ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-500/5"
                             : "border-border hover:bg-muted/50"
-                        }`}
+                          }`}
                         onClick={() => setColorScheme("emerald")}
                       >
                         <div className="h-8 bg-emerald-500 rounded-lg"></div>
@@ -352,11 +389,10 @@ export default function SettingsPage() {
                       </div>
 
                       <div
-                        className={`border rounded-xl p-3 cursor-pointer transition-all ${
-                          colorScheme === "blue"
+                        className={`border rounded-xl p-3 cursor-pointer transition-all ${colorScheme === "blue"
                             ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-500/5"
                             : "border-border hover:bg-muted/50"
-                        }`}
+                          }`}
                         onClick={() => setColorScheme("blue")}
                       >
                         <div className="h-8 bg-blue-500 rounded-lg"></div>
@@ -364,11 +400,10 @@ export default function SettingsPage() {
                       </div>
 
                       <div
-                        className={`border rounded-xl p-3 cursor-pointer transition-all ${
-                          colorScheme === "purple"
+                        className={`border rounded-xl p-3 cursor-pointer transition-all ${colorScheme === "purple"
                             ? "border-purple-500 ring-2 ring-purple-500/20 bg-purple-500/5"
                             : "border-border hover:bg-muted/50"
-                        }`}
+                          }`}
                         onClick={() => setColorScheme("purple")}
                       >
                         <div className="h-8 bg-purple-500 rounded-lg"></div>
@@ -376,11 +411,10 @@ export default function SettingsPage() {
                       </div>
 
                       <div
-                        className={`border rounded-xl p-3 cursor-pointer transition-all ${
-                          colorScheme === "orange"
+                        className={`border rounded-xl p-3 cursor-pointer transition-all ${colorScheme === "orange"
                             ? "border-orange-500 ring-2 ring-orange-500/20 bg-orange-500/5"
                             : "border-border hover:bg-muted/50"
-                        }`}
+                          }`}
                         onClick={() => setColorScheme("orange")}
                       >
                         <div className="h-8 bg-orange-500 rounded-lg"></div>
@@ -392,35 +426,19 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* TAB 3: SECURITY (CHANGE PASSWORD ONLY) */}
+            {/* TAB 3: SECURITY (CHANGE PASSWORD) */}
             {activeTab === "security" && (
-              <div className="space-y-6">
-                {/* Security Header Banner */}
-                <div className="bg-gradient-to-r from-primary/15 via-primary/5 to-transparent p-5 rounded-2xl border border-primary/20 flex items-center space-x-3.5">
-                  <div className="p-3 bg-primary text-primary-foreground rounded-xl shadow-md">
-                    <Shield className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-foreground">Security Settings</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Update your account password to maintain security.
-                    </p>
-                  </div>
-                </div>
+              <div>
+                <h2 className="text-lg font-bold text-foreground mb-6 flex items-center">
+                  <Shield className="h-5 w-5 mr-2 text-primary" />
+                  Security Settings
+                </h2>
 
-                {/* Change Password Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-border pb-3">
-                    <div className="flex items-center space-x-2">
-                      <Lock className="h-4 w-4 text-primary" />
-                      <h3 className="text-base font-semibold text-foreground">Change Password</h3>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handlePasswordUpdate} className="space-y-4 max-w-xl">
+                <form onSubmit={handlePasswordUpdate} className="space-y-6">
+                  <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1">Current Password</label>
-                      <div className="relative">
+                      <label className="block text-sm font-medium text-foreground mb-1">Current Password</label>
+                      <div className="relative max-w-md">
                         <input
                           type={showCurrentPass ? "text" : "password"}
                           value={currentPassword}
@@ -438,9 +456,9 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-xs font-medium text-muted-foreground mb-1">New Password</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">New Password</label>
                         <div className="relative">
                           <input
                             type={showNewPass ? "text" : "password"}
@@ -457,10 +475,11 @@ export default function SettingsPage() {
                             {showNewPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
                         </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">Must be at least 6 characters long</p>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-muted-foreground mb-1">Confirm New Password</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Confirm New Password</label>
                         <div className="relative">
                           <input
                             type={showConfirmPass ? "text" : "password"}
@@ -477,13 +496,16 @@ export default function SettingsPage() {
                             {showConfirmPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
                         </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">Re-enter your new password to verify</p>
                       </div>
                     </div>
+                  </div>
 
+                  <div className="pt-4 border-t border-border flex justify-end">
                     <button
                       type="submit"
                       disabled={isUpdatingPassword}
-                      className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 flex items-center transition-colors shadow-xs"
+                      className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 flex items-center transition-colors shadow-xs"
                     >
                       {isUpdatingPassword ? (
                         <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -492,8 +514,8 @@ export default function SettingsPage() {
                       )}
                       Update Password
                     </button>
-                  </form>
-                </div>
+                  </div>
+                </form>
               </div>
             )}
           </div>

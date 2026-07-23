@@ -3,7 +3,7 @@
 import type React from "react"
 import { useEffect, useState, Suspense, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Bell } from "lucide-react"
+import { Bell, Waves } from "lucide-react"
 import SideNavigation from "@/components/side-navigation"
 import AccountDropdown from "@/components/account-dropdown"
 import MobileSidebarToggle from "@/components/mobile-sidebar-toggle"
@@ -50,8 +50,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         notification.remark && notification.remark.toLowerCase().includes("high")
           ? "Elevated"
           : notification.remark && notification.remark.toLowerCase().includes("moderate")
-          ? "Moderate"
-          : "Low"
+            ? "Moderate"
+            : "Low"
 
       toast.success(`AI Risk Audit Complete: ${notification.remark}`, {
         description: `Transaction #${notification.txId} · Status: ${notification.status}`,
@@ -190,11 +190,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <div className="bg-card shadow-lg h-full">
           {/* Header */}
           <header className="flex items-center justify-between p-4 border-b border-border">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <div id="mobile-sidebar-toggle">
                 <MobileSidebarToggle onToggle={setMobileSidebarOpen} isOpen={mobileSidebarOpen} />
               </div>
-              <h1 className="text-primary font-bold text-xl">Wave Terminal</h1>
+              <div className="flex items-center space-x-2">
+                <Waves className="h-6 w-6 text-emerald-500" />
+                <h1 className="text-green-500 font-bold text-xl">Wave</h1>
+              </div>
             </div>
 
             <HeaderSearch />
@@ -242,13 +245,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-sm font-semibold text-foreground">{report.title}</span>
                               <span
-                                className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                                  report.level === "Elevated"
+                                className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${report.level === "Elevated"
                                     ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
                                     : report.level === "Moderate"
-                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                                    : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                                }`}
+                                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                  }`}
                               >
                                 {report.level} risk
                               </span>
@@ -280,9 +282,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             {/* Sidebar */}
             <div
               id="mobile-sidebar"
-              className={`${
-                mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-              } fixed inset-y-0 left-0 z-30 w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:w-[300px]`}
+              className={`${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                } fixed inset-y-0 left-0 z-30 w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:w-[300px]`}
             >
               <SideNavigation onCloseMobile={() => setMobileSidebarOpen(false)} />
             </div>

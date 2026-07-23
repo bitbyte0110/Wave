@@ -73,3 +73,7 @@
    **Navigation:** Quick routes to *Dashboard*, *Wallet Ledger*, *Instant Swap*, and *Settings*.
    **Quick Actions:** Direct shortcuts for *Deposit Funds* and *Instant Swap*.
 * **UX & Accessibility:** Supports global `Ctrl+K` / `⌘K` focus hotkey, `↑` / `↓` / `Enter` keyboard navigation, `Esc` dismiss, and click-outside closing.
+
+Project NAme Wave
+Waves icon from lucide-react across the brand icon boxes in 
+
