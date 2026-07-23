@@ -48,6 +48,22 @@ export const getMemoryUser = (): UserSession | null => {
   return inMemoryUser;
 };
 
+export const getAuthToken = (): string | null => {
+  return getMemoryToken();
+};
+
+export const getAuthUser = (): UserSession | null => {
+  return getMemoryUser();
+};
+
+export const setAuthSession = (session: UserSession) => {
+  setMemoryAuth(session);
+};
+
+export const clearAuthSession = () => {
+  setMemoryAuth(null);
+};
+
 /**
  * Checks if a user is currently authenticated in memory.
  */

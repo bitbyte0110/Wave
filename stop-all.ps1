@@ -1,6 +1,6 @@
 # E:\Development\Wave\stop-all.ps1
 
-Write-Host "🛑 Stopping all Wave Terminal microservices & frontend..." -ForegroundColor Red
+Write-Host "🛑 Stopping all Wave microservices & frontend..." -ForegroundColor Red
 
 $ports = @(8080, 8081, 8082, 8083, 8084, 3000)
 

@@ -15,8 +15,8 @@
 	<artifactId>terminal</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
-	<name>Wave Terminal — Parent</name>
-	<description>Parent aggregator POM for the Wave Terminal multi-module backend.</description>
+	<name>Wave — Parent</name>
+	<description>Parent aggregator POM for the Wave multi-module backend.</description>
 
 	<properties>
 		<java.version>17</java.version>

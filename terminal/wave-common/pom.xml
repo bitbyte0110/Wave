@@ -16,7 +16,7 @@
 	<description>
 		Plain Java records for shared API response shapes and RabbitMQ event payloads.
 		No Spring beans, no JPA annotations. This module may be depended on by any
-		Wave Terminal service module without pulling in infrastructure dependencies.
+		Wave service module without pulling in infrastructure dependencies.
 	</description>
 
 	<dependencies>

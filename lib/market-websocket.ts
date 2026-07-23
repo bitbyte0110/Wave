@@ -49,7 +49,7 @@ export function createMarketWebSocket(): MarketWebSocketManager {
   let currentWsUrl = primaryWsUrl
 
   const stompClient = new Client({
-    webSocketFactory: () => new SockJS(currentWsUrl, null, { withCredentials: true }),
+    webSocketFactory: () => new SockJS(currentWsUrl),
     beforeConnect: () => {
       const token = getMemoryToken()
       if (token) {

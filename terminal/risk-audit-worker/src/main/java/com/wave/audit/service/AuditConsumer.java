@@ -16,7 +16,7 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * AI Async Risk Audit Consumer — Wave Terminal Risk-Audit-Worker
+ * AI Async Risk Audit Consumer — Wave Risk-Audit-Worker
  *
  * Consumes swap events from RabbitMQ, calls Gemini AI API for risk analysis,
  * sends the remark to Swap-Engine via HTTP internal PATCH endpoint, and publishes audit completion.

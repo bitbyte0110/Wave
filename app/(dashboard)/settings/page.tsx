@@ -134,7 +134,7 @@ export default function SettingsPage() {
       return
     }
 
-    const currentUser = user || getAuthUser()
+    const currentUser = user
 
     setIsUpdatingPassword(true)
 

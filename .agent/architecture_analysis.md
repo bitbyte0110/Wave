@@ -1,4 +1,4 @@
-# Wave Terminal — Architecture Gap Analysis
+# Wave — Architecture Gap Analysis
 ## Current Monolith vs. Target Microservices
 
 ---

@@ -1,6 +1,6 @@
 # E:\Development\Wave\start-all.ps1
 
-Write-Host "Starting Wave Terminal Microservices..." -ForegroundColor Cyan
+Write-Host "Starting Wave Microservices..." -ForegroundColor Cyan
 
 # 1. Start Spring Boot Services in separate PowerShell windows
 Write-Host "Starting Gateway..." -ForegroundColor Yellow
