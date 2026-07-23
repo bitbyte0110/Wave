@@ -33,9 +33,8 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
             <Link
               href="/dashboard"
               onClick={handleClick}
-              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${
-                isActive("/dashboard") ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${isActive("/dashboard") ? "text-primary" : "text-muted-foreground"
+                }`}
             >
               <div className="relative mr-3 flex items-center justify-center">
                 <div
@@ -60,9 +59,8 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
             <Link
               href="/wallet"
               onClick={handleClick}
-              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${
-                isActive("/wallet") ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${isActive("/wallet") ? "text-primary" : "text-muted-foreground"
+                }`}
             >
               <Wallet className="h-5 w-5 mr-3 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
               <span className="transition-all duration-200 group-hover:translate-x-1 group-active:translate-x-0">
@@ -77,9 +75,8 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
             <Link
               href="/swap"
               onClick={handleClick}
-              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${
-                isActive("/swap") ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${isActive("/swap") ? "text-primary" : "text-muted-foreground"
+                }`}
             >
               <ArrowLeftRight className="h-5 w-5 mr-3 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
               <span className="transition-all duration-200 group-hover:translate-x-1 group-active:translate-x-0">
@@ -94,9 +91,8 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
             <Link
               href="/settings"
               onClick={handleClick}
-              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${
-                isActive("/settings") ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${isActive("/settings") ? "text-primary" : "text-muted-foreground"
+                }`}
             >
               <Settings className="h-5 w-5 mr-3 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
               <span className="transition-all duration-200 group-hover:translate-x-1 group-active:translate-x-0">
@@ -111,7 +107,7 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
       </nav>
       <div className="px-6 py-6 border-t border-border mt-auto text-center">
         <a
-          href=""
+          href="https://github.com/bitbyte0110/Wave"
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center justify-center"

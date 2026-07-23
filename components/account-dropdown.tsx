@@ -3,17 +3,13 @@
 import { useState, useRef, useEffect } from "react"
 import { User, LogOut, Settings, UserCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { getAuthUser, clearAuthSession, UserSession } from "@/lib/auth"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function AccountDropdown() {
   const [isOpen, setIsOpen] = useState(false)
-  const [user, setUser] = useState<UserSession | null>(null)
+  const { user, logout } = useAuth()
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-
-  useEffect(() => {
-    setUser(getAuthUser())
-  }, [])
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -29,8 +25,8 @@ export default function AccountDropdown() {
     }
   }, [])
 
-  const handleSignOut = () => {
-    clearAuthSession()
+  const handleSignOut = async () => {
+    await logout()
     router.push("/login")
   }
 
@@ -39,12 +35,16 @@ export default function AccountDropdown() {
     router.push("/settings")
   }
 
+  const handleToggle = () => {
+    setIsOpen((prev) => !prev)
+  }
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         id="account-dropdown-btn"
         className={`bg-primary rounded-full p-2 transition-all duration-200 ${isOpen ? "ring-2 ring-primary/30" : "hover:bg-primary/90"}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         aria-label="User Account"
       >
         <User className="h-5 w-5 text-primary-foreground" />

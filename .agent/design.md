@@ -52,19 +52,9 @@
 | [app/page.tsx](file:///e:/Development/Wave/app/page.tsx) | Root redirect → `/login` |
 
 **Note:** Auth currently uses a `sessionStorage` flag as a placeholder. PRD specifies real JWT tokens injected into HTTP headers and WebSocket handshakes — this needs replacing with a proper JWT flow.
+|
 
----
-
-### 5.4 Summary: What Needs Doing
-
-| Priority | Item |
-|---|---|
-| 🔴 High | Wire Dashboard live tickers to WebSocket (Service 2) |
-| 🔴 High | Wire Wallet Deposit/Withdraw/Swap tabs to backend REST API (Service 1) |
-| 🔴 High | Replace `sessionStorage` auth flag with real JWT token handling |
-| 🟡 Medium | Implement notification bell WebSocket listener (Service 4 push events) |
-
-### 5.5 Top Search Bar Implementation (`HeaderSearch`)
+### 5.4 Top Search Bar Implementation (`HeaderSearch`)
 
 * **New Component:** Added `components/header-search.tsx` and integrated it into `app/(dashboard)/layout.tsx`.
 * **Live Market Feed:** Uses `useMarketStream()` WebSocket for real-time asset prices and 24h changes (BTC, ETH, USDT, BNB, XRP).

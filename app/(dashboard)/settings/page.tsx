@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import {
   User,
   Shield,
@@ -16,17 +16,21 @@ import {
   CheckCircle,
 } from "lucide-react"
 import { useTheme } from "@/contexts/theme-context"
-import { getAuthUser, setAuthSession, UserSession, GATEWAY_URL } from "@/lib/auth"
+import { putAuthApi, postAuthApi, UserSession } from "@/lib/auth"
+import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<"account" | "appearance" | "security">("account")
   const { theme, setTheme, colorScheme, setColorScheme } = useTheme()
-  const [user, setUser] = useState<UserSession | null>(null)
+  const { user, updateUserSession } = useAuth()
+
+  const isSubmittingAccountRef = useRef(false)
+  const isSubmittingPasswordRef = useRef(false)
 
   // Account Form State (Aligned with Database Entity: id, username, email)
-  const [username, setUsername] = useState("")
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState(user?.username || "")
+  const [email, setEmail] = useState(user?.email || "")
   const [isSavingAccount, setIsSavingAccount] = useState(false)
 
   // Security Form State
@@ -39,120 +43,126 @@ export default function SettingsPage() {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
 
   useEffect(() => {
-    const auth = getAuthUser()
-    setUser(auth)
-    if (auth) {
-      if (auth.username) setUsername(auth.username)
-      if (auth.email) setEmail(auth.email)
+    if (user) {
+      if (user.username) setUsername(user.username)
+      if (user.email) setEmail(user.email)
     }
-  }, [])
+  }, [user])
 
-  // Handle Account Form Submit (Save Username & Email matching DB User Entity)
+  // Handle Account Form Submit (Save Username & Email to DB in auth-service)
   const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (isSubmittingAccountRef.current || isSavingAccount) return
+    isSubmittingAccountRef.current = true
+
     if (!username.trim()) {
       toast.error("Username cannot be empty.")
+      isSubmittingAccountRef.current = false
       return
     }
     if (!email.trim() || !email.includes("@")) {
       toast.error("Please enter a valid email address.")
+      isSubmittingAccountRef.current = false
       return
     }
+
+    const currentUser = user
 
     setIsSavingAccount(true)
 
     try {
-      // Optional REST API call to backend auth-service
-      await fetch(`${GATEWAY_URL}/api/v1/auth/profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.token || ""}`,
-        },
-        body: JSON.stringify({
-          userId: user?.userId,
-          username: username.trim(),
-          email: email.trim(),
-        }),
-      }).catch(() => null)
-
-      // Update auth session in localStorage & sessionStorage for current system
-      const updatedSession: UserSession = {
-        token: user?.token || "mock-jwt-token",
-        userId: user?.userId || 1001,
+      const payload = {
+        userId: currentUser?.userId,
+        currentEmail: currentUser?.email,
         username: username.trim(),
         email: email.trim(),
       }
 
-      setAuthSession(updatedSession)
-      setUser(updatedSession)
+      const res = await putAuthApi("/api/v1/auth/profile", payload)
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update profile.")
+      }
+
+      // Sync user session with updated details
+      updateUserSession({
+        username: data.username || username.trim(),
+        email: data.email || email.trim(),
+      })
 
       toast.success("Account profile updated successfully!")
-    } catch {
-      toast.error("Failed to update profile. Please try again.")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update profile. Please try again.")
     } finally {
       setIsSavingAccount(false)
+      isSubmittingAccountRef.current = false
     }
   }
 
-  // Handle Password Update Submit
+  // Handle Password Update Submit (Save new password hash in auth-service DB)
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (isSubmittingPasswordRef.current || isUpdatingPassword) return
+    isSubmittingPasswordRef.current = true
+
     if (!currentPassword) {
       toast.error("Please enter your current password.")
+      isSubmittingPasswordRef.current = false
       return
     }
     if (!newPassword) {
       toast.error("Please enter your new password.")
+      isSubmittingPasswordRef.current = false
       return
     }
     if (newPassword.length < 6) {
       toast.error("New password must be at least 6 characters long.")
+      isSubmittingPasswordRef.current = false
       return
     }
     if (newPassword === currentPassword) {
       toast.error("New password must be different from current password.")
+      isSubmittingPasswordRef.current = false
       return
     }
     if (newPassword !== confirmPassword) {
       toast.error("New password and confirmation do not match.")
+      isSubmittingPasswordRef.current = false
       return
     }
+
+    const currentUser = user || getAuthUser()
 
     setIsUpdatingPassword(true)
 
     try {
-      const res = await fetch(`${GATEWAY_URL}/api/v1/auth/password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user?.token || ""}`,
-        },
-        body: JSON.stringify({
-          userId: user?.userId,
-          currentPassword,
-          newPassword,
-        }),
-      }).catch(() => null)
-
-      if (res && res.ok) {
-        toast.success("Password updated successfully!")
-      } else {
-        if (typeof window !== "undefined") {
-          localStorage.setItem(`wave_pwd_${user?.userId || "guest"}`, newPassword)
-        }
-        toast.success("Password updated successfully!")
+      const payload = {
+        userId: currentUser?.userId,
+        email: currentUser?.email || email,
+        currentPassword,
+        newPassword,
       }
+
+      const res = await postAuthApi("/api/v1/auth/password", payload)
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update password.")
+      }
+
+      toast.success("Password updated successfully!")
 
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
-    } catch {
-      toast.error("Failed to update password. Please try again.")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update password. Please check your current password.")
     } finally {
       setIsUpdatingPassword(false)
+      isSubmittingPasswordRef.current = false
     }
   }
 
@@ -229,8 +239,8 @@ export default function SettingsPage() {
                 <form onSubmit={handleSaveAccount} className="space-y-6">
                   {/* Account Header Badge */}
                   <div className="flex items-center space-x-4 pb-4 border-b border-border">
-                    <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-xl border border-primary/30 shrink-0">
-                      {username ? username.charAt(0).toUpperCase() : "U"}
+                    <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0 shadow-xs">
+                      <User className="h-8 w-8" />
                     </div>
                     <div>
                       <div className="font-semibold text-foreground text-base">{username || "User Account"}</div>

@@ -1,7 +1,7 @@
 package com.wave.market.config;
 
 import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
  *
  * Declares:
  *  - audit.done.queue (durable) — consumed by NotificationConsumer
- *  - JacksonJsonMessageConverter — automatic JSON deserialization of AuditDonePayload
+ *  - Jackson2JsonMessageConverter — automatic JSON deserialization of AuditDonePayload
  */
 @Configuration
 public class RabbitMQConfig {
@@ -23,7 +23,7 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public JacksonJsonMessageConverter jsonMessageConverter() {
-        return new JacksonJsonMessageConverter();
+    public Jackson2JsonMessageConverter jsonMessageConverter() {
+        return new Jackson2JsonMessageConverter();
     }
 }

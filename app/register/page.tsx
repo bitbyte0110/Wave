@@ -1,14 +1,15 @@
 "use client"
 
 import type React from "react"
-import { useState, Suspense } from "react"
+import { useState, useRef, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, Check, X, ArrowLeft, User, Mail, Lock, ShieldAlert, Waves } from "lucide-react"
-import { postAuthApi, setAuthSession } from "@/lib/auth"
+import { postAuthApi } from "@/lib/auth"
 
 function RegisterFormContent() {
   const router = useRouter()
+  const isSubmittingRef = useRef(false)
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -72,10 +73,13 @@ function RegisterFormContent() {
     e.preventDefault()
     setApiError("")
 
+    if (isSubmittingRef.current) return
+
     if (!validateForm()) {
       return
     }
 
+    isSubmittingRef.current = true
     setIsLoading(true)
 
     try {
@@ -91,19 +95,16 @@ function RegisterFormContent() {
         throw new Error(data.error || "Registration failed. Please try again.")
       }
 
-      // Automatically log in and persist session
-      setAuthSession({
-        token: data.token,
-        userId: data.userId,
-        username: data.username,
-        email: data.email,
-      })
+      // Store registered email for pre-filling login form & show success notice
+      sessionStorage.setItem("registeredEmail", formData.email)
 
-      router.push("/dashboard")
+      // Navigate to login page so user manually logs in
+      router.push("/login?registered=true")
     } catch (err: any) {
       setApiError(err.message || "Could not connect to backend Auth Service.")
     } finally {
       setIsLoading(false)
+      isSubmittingRef.current = false
     }
   }
 
@@ -151,9 +152,8 @@ function RegisterFormContent() {
                 required
                 value={formData.username}
                 onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-2 bg-slate-950/60 border ${
-                  errors.username ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
-                } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
+                className={`w-full pl-10 pr-4 py-2 bg-slate-950/60 border ${errors.username ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
+                  } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
                 placeholder="alex_trader"
               />
             </div>
@@ -175,9 +175,8 @@ function RegisterFormContent() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-2 bg-slate-950/60 border ${
-                  errors.email ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
-                } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
+                className={`w-full pl-10 pr-4 py-2 bg-slate-950/60 border ${errors.email ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
+                  } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
                 placeholder="alex@example.com"
               />
             </div>
@@ -199,9 +198,8 @@ function RegisterFormContent() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className={`w-full pl-10 pr-10 py-2 bg-slate-950/60 border ${
-                  errors.password ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
-                } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
+                className={`w-full pl-10 pr-10 py-2 bg-slate-950/60 border ${errors.password ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
+                  } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
                 placeholder="••••••••"
               />
               <button
@@ -231,9 +229,8 @@ function RegisterFormContent() {
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className={`w-full pl-10 pr-10 py-2 bg-slate-950/60 border ${
-                  errors.confirmPassword ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
-                } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
+                className={`w-full pl-10 pr-10 py-2 bg-slate-950/60 border ${errors.confirmPassword ? "border-rose-500" : "border-slate-800 focus:border-emerald-500"
+                  } rounded-xl text-sm text-slate-100 placeholder-slate-500 outline-none transition-all`}
                 placeholder="••••••••"
               />
               <button
@@ -286,9 +283,8 @@ function RegisterFormContent() {
           type="submit"
           id="register-submit-btn"
           disabled={isLoading}
-          className={`w-full flex justify-center items-center py-2.5 px-4 rounded-xl font-semibold text-sm text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 shadow-lg shadow-emerald-500/25 transition-all duration-200 ${
-            isLoading ? "opacity-75 cursor-not-allowed" : "hover:scale-[1.01] active:scale-[0.99]"
-          }`}
+          className={`w-full flex justify-center items-center py-2.5 px-4 rounded-xl font-semibold text-sm text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 shadow-lg shadow-emerald-500/25 transition-all duration-200 ${isLoading ? "opacity-75 cursor-not-allowed" : "hover:scale-[1.01] active:scale-[0.99]"
+            }`}
         >
           {isLoading ? (
             <span className="flex items-center space-x-2">

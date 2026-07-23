@@ -1,6 +1,6 @@
 import { Client, IMessage } from "@stomp/stompjs"
 import SockJS from "sockjs-client"
-import { GATEWAY_URL } from "./auth"
+import { GATEWAY_URL, getMemoryToken } from "./auth"
 
 export const MARKET_STREAMING_DIRECT_URL = "http://localhost:8081"
 
@@ -49,7 +49,15 @@ export function createMarketWebSocket(): MarketWebSocketManager {
   let currentWsUrl = primaryWsUrl
 
   const stompClient = new Client({
-    webSocketFactory: () => new SockJS(currentWsUrl),
+    webSocketFactory: () => new SockJS(currentWsUrl, null, { withCredentials: true }),
+    beforeConnect: () => {
+      const token = getMemoryToken()
+      if (token) {
+        stompClient.connectHeaders = {
+          Authorization: `Bearer ${token}`,
+        }
+      }
+    },
     reconnectDelay: 5000,
     heartbeatIncoming: 4000,
     heartbeatOutgoing: 4000,

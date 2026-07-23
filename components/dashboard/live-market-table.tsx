@@ -174,11 +174,10 @@ export default function LiveMarketTable() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 text-sm rounded-md transition ${
-                activeTab === tab
+              className={`px-3 py-1.5 text-sm rounded-md transition ${activeTab === tab
                   ? "font-semibold bg-muted text-foreground"
                   : "font-medium text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               {tab}
             </button>
@@ -223,9 +222,8 @@ export default function LiveMarketTable() {
                 <td className="py-4 px-6 text-center">
                   <button
                     onClick={() => toggleFavorite(coin.id)}
-                    className={`transition hover:scale-110 ${
-                      coin.favorite ? "text-amber-500" : "text-muted-foreground/40 hover:text-amber-500"
-                    }`}
+                    className={`transition hover:scale-110 ${coin.favorite ? "text-amber-500" : "text-muted-foreground/40 hover:text-amber-500"
+                      }`}
                     aria-label={coin.favorite ? `Remove ${coin.name} from favorites` : `Add ${coin.name} to favorites`}
                   >
                     <Star className="h-[18px] w-[18px]" fill={coin.favorite ? "currentColor" : "none"} />
@@ -246,27 +244,24 @@ export default function LiveMarketTable() {
                   </div>
                 </td>
                 <td
-                  className={`py-4 px-6 text-right font-bold tracking-tight rounded transition-all duration-300 ${
-                    flashMap[coin.id] === "up"
+                  className={`py-4 px-6 text-right font-bold tracking-tight rounded transition-all duration-300 ${flashMap[coin.id] === "up"
                       ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-extrabold"
                       : flashMap[coin.id] === "down"
-                      ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold"
-                      : ""
-                  }`}
+                        ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold"
+                        : ""
+                    }`}
                 >
                   {formatPrice(coin.price, coin.decimals)}
                 </td>
                 <td
-                  className={`py-4 px-6 text-right font-semibold ${
-                    coin.change24h >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                  }`}
+                  className={`py-4 px-6 text-right font-semibold ${coin.change24h >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                    }`}
                 >
                   {formatPct(coin.change24h)}
                 </td>
                 <td
-                  className={`py-4 px-6 text-right font-semibold ${
-                    coin.change7d >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                  }`}
+                  className={`py-4 px-6 text-right font-semibold ${coin.change7d >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                    }`}
                 >
                   {formatPct(coin.change7d)}
                 </td>

@@ -1,15 +1,18 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, ArrowRight, UserPlus, Lock, Mail, ShieldAlert, Waves } from "lucide-react"
-import { postAuthApi, setAuthSession } from "@/lib/auth"
+import { postAuthApi } from "@/lib/auth"
+import { useAuth } from "@/contexts/auth-context"
 
 function LoginFormContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { login: loginUser } = useAuth()
+  const isSubmittingRef = useRef(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -41,8 +44,11 @@ function LoginFormContent() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmittingRef.current) return
+
     setError("")
     setSuccessMessage("")
+    isSubmittingRef.current = true
     setIsLoading(true)
 
     try {
@@ -54,8 +60,8 @@ function LoginFormContent() {
         throw new Error(data.error || "Authentication failed. Please check your credentials.")
       }
 
-      // Persist auth session
-      setAuthSession({
+      // Store in-memory auth session via AuthContext
+      loginUser({
         token: data.token,
         userId: data.userId,
         username: data.username,
@@ -73,6 +79,7 @@ function LoginFormContent() {
       setError(err.message || "Failed to connect to API Gateway on port 8080.")
     } finally {
       setIsLoading(false)
+      isSubmittingRef.current = false
     }
   }
 
@@ -178,9 +185,8 @@ function LoginFormContent() {
           type="submit"
           id="login-submit-btn"
           disabled={isLoading}
-          className={`w-full flex justify-center items-center py-3 px-4 rounded-xl font-semibold text-sm text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 shadow-lg shadow-emerald-500/25 transition-all duration-200 ${
-            isLoading ? "opacity-75 cursor-not-allowed" : "hover:scale-[1.01] active:scale-[0.99]"
-          }`}
+          className={`w-full flex justify-center items-center py-3 px-4 rounded-xl font-semibold text-sm text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 shadow-lg shadow-emerald-500/25 transition-all duration-200 ${isLoading ? "opacity-75 cursor-not-allowed" : "hover:scale-[1.01] active:scale-[0.99]"
+            }`}
         >
           {isLoading ? (
             <span className="flex items-center space-x-2">

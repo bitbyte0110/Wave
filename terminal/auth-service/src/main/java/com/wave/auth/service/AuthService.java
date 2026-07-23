@@ -17,10 +17,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
- * Auth business logic for Auth Service.
- * Publishes user.registered event to RabbitMQ on successful registration
- * so Swap-Engine can asynchronously provision the zero-balance wallet.
+ * Auth business logic for Auth Service with Refresh Token Rotation (RTR).
  */
 @Service
 @RequiredArgsConstructor
@@ -33,11 +33,20 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
+    private final RefreshTokenService refreshTokenService;
+
+    public record AuthResult(AuthResponse response, String refreshToken) {}
 
     @Transactional
-    public AuthResponse register(String email, String username, String password) {
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new RuntimeException("An account with email '" + email + "' already exists.");
+    public AuthResult register(String email, String username, String password) {
+        Optional<User> existing = userRepository.findByEmail(email);
+        if (existing.isPresent()) {
+            User user = existing.get();
+            log.info("REGISTER (IDEMPOTENT) ▶ user id={} email={} already exists, returning session token", user.getId(), email);
+            UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+            String token = jwtUtil.generateToken(userDetails, user.getId());
+            String refreshToken = refreshTokenService.createRefreshToken(user.getId());
+            return new AuthResult(new AuthResponse(token, user.getId(), user.getUsername(), user.getEmail()), refreshToken);
         }
 
         User user = new User();
@@ -53,11 +62,12 @@ public class AuthService {
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
         String token = jwtUtil.generateToken(userDetails, savedUser.getId());
+        String refreshToken = refreshTokenService.createRefreshToken(savedUser.getId());
 
-        return new AuthResponse(token, savedUser.getId(), savedUser.getUsername(), savedUser.getEmail());
+        return new AuthResult(new AuthResponse(token, savedUser.getId(), savedUser.getUsername(), savedUser.getEmail()), refreshToken);
     }
 
-    public AuthResponse login(String email, String password) {
+    public AuthResult login(String email, String password) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(email, password));
 
@@ -69,7 +79,85 @@ public class AuthService {
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
         String token = jwtUtil.generateToken(userDetails, user.getId());
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId());
 
-        return new AuthResponse(token, user.getId(), user.getUsername(), user.getEmail());
+        return new AuthResult(new AuthResponse(token, user.getId(), user.getUsername(), user.getEmail()), refreshToken);
+    }
+
+    public AuthResult refreshToken(String refreshTokenCookieStr) {
+        RefreshTokenService.RefreshTokenResult result = refreshTokenService.rotateRefreshToken(refreshTokenCookieStr);
+        User user = userRepository.findById(result.userId())
+                .orElseThrow(() -> new RuntimeException("User not found for refresh token session."));
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        String accessToken = jwtUtil.generateToken(userDetails, user.getId());
+
+        return new AuthResult(new AuthResponse(accessToken, user.getId(), user.getUsername(), user.getEmail()), result.refreshToken());
+    }
+
+    public void logout(String refreshTokenCookieStr) {
+        refreshTokenService.revokeRefreshToken(refreshTokenCookieStr);
+    }
+
+    @Transactional
+    public AuthResponse updateProfile(Long userId, String currentEmail, String username, String newEmail) {
+        User user = null;
+        if (currentEmail != null && !currentEmail.isBlank()) {
+            user = userRepository.findByEmail(currentEmail.trim().toLowerCase()).orElse(null);
+        }
+        if (user == null && newEmail != null && !newEmail.isBlank()) {
+            user = userRepository.findByEmail(newEmail.trim().toLowerCase()).orElse(null);
+        }
+        if (user == null && userId != null && userId > 0) {
+            user = userRepository.findById(userId).orElse(null);
+        }
+        if (user == null) {
+            throw new RuntimeException("User account not found.");
+        }
+
+        if (!user.getEmail().equalsIgnoreCase(newEmail)) {
+            Optional<User> existing = userRepository.findByEmail(newEmail.trim().toLowerCase());
+            if (existing.isPresent() && !existing.get().getId().equals(user.getId())) {
+                throw new RuntimeException("Email '" + newEmail + "' is already in use by another account.");
+            }
+        }
+
+        user.setUsername(username);
+        user.setEmail(newEmail);
+        User updatedUser = userRepository.save(user);
+
+        log.info("UPDATE PROFILE ▶ user id={} username={} email={}", updatedUser.getId(), username, newEmail);
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(updatedUser.getEmail());
+        String token = jwtUtil.generateToken(userDetails, updatedUser.getId());
+
+        return new AuthResponse(token, updatedUser.getId(), updatedUser.getUsername(), updatedUser.getEmail());
+    }
+
+    @Transactional
+    public void updatePassword(Long userId, String email, String currentPassword, String newPassword) {
+        User user = null;
+        if (email != null && !email.isBlank()) {
+            user = userRepository.findByEmail(email.trim().toLowerCase()).orElse(null);
+        }
+        if (user == null && userId != null && userId > 0) {
+            user = userRepository.findById(userId).orElse(null);
+        }
+        if (user == null) {
+            throw new RuntimeException("User account not found.");
+        }
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+                log.info("UPDATE PASSWORD (IDEMPOTENT) ▶ user id={} email={} password was already updated", user.getId(), user.getEmail());
+                return;
+            }
+            throw new IllegalArgumentException("Current password does not match existing password.");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        log.info("UPDATE PASSWORD ▶ user id={} email={} password updated successfully", user.getId(), user.getEmail());
     }
 }

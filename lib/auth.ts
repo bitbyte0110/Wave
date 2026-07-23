@@ -1,7 +1,7 @@
 /**
- * Helper utilities for managing authentication tokens, user sessions,
+ * Helper utilities for managing in-memory authentication tokens, user sessions,
  * and API calls routed through Spring Cloud Gateway (port 8080)
- * with automatic fallback to standalone microservice ports (e.g. 8082 for auth-service).
+ * with HttpOnly Refresh Cookie support & automatic service fallback.
  */
 
 export const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
@@ -14,107 +14,99 @@ export interface UserSession {
   email: string;
 }
 
-/**
- * Persists user auth state into localStorage and session cookies upon login/register.
- */
-export const setAuthSession = (session: UserSession) => {
-  if (typeof window === "undefined") return;
+// In-Memory Storage for Short-Lived Access Token (Never written to localStorage)
+let inMemoryToken: string | null = null;
+let inMemoryUser: UserSession | null = null;
 
-  localStorage.setItem("token", session.token);
-  localStorage.setItem("userId", String(session.userId));
-  localStorage.setItem("username", session.username);
-  localStorage.setItem("email", session.email);
+export const setMemoryAuth = (session: UserSession | null) => {
+  if (!session) {
+    inMemoryToken = null;
+    inMemoryUser = null;
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("isLoggedIn");
+      document.cookie = "isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      window.dispatchEvent(new Event("auth-change"));
+    }
+    return;
+  }
 
-  sessionStorage.setItem("isLoggedIn", "true");
-  document.cookie = `token=${session.token}; path=/; max-age=86400`;
-  document.cookie = "isLoggedIn=true; path=/; max-age=86400";
+  inMemoryToken = session.token;
+  inMemoryUser = session;
+
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem("isLoggedIn", "true");
+    document.cookie = "isLoggedIn=true; path=/; max-age=604800";
+    window.dispatchEvent(new Event("auth-change"));
+  }
+};
+
+export const getMemoryToken = (): string | null => {
+  return inMemoryToken;
+};
+
+export const getMemoryUser = (): UserSession | null => {
+  return inMemoryUser;
 };
 
 /**
- * Clears all authentication state from storage and cookies on sign out.
- */
-export const clearAuthSession = () => {
-  if (typeof window === "undefined") return;
-
-  localStorage.removeItem("token");
-  localStorage.removeItem("userId");
-  localStorage.removeItem("username");
-  localStorage.removeItem("email");
-  sessionStorage.removeItem("isLoggedIn");
-  sessionStorage.removeItem("registeredEmail");
-
-  document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-  document.cookie = "isLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-};
-
-/**
- * Retrieves the current JWT token from localStorage.
- */
-export const getAuthToken = (): string | null => {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
-};
-
-/**
- * Retrieves the current authenticated user details from localStorage.
- */
-export const getAuthUser = (): UserSession | null => {
-  if (typeof window === "undefined") return null;
-
-  const token = localStorage.getItem("token");
-  const userIdStr = localStorage.getItem("userId");
-  const username = localStorage.getItem("username");
-  const email = localStorage.getItem("email");
-
-  if (!token || !userIdStr) return null;
-
-  return {
-    token,
-    userId: Number(userIdStr),
-    username: username || "User",
-    email: email || "",
-  };
-};
-
-/**
- * Checks if a user is currently authenticated.
+ * Checks if a user is currently authenticated in memory.
  */
 export const isAuthenticated = (): boolean => {
-  return getAuthToken() !== null;
+  return inMemoryToken !== null;
 };
 
 /**
- * Posts authentication payloads with automatic fallback:
+ * Posts authentication payloads with HttpOnly cookies & automatic fallback:
  * 1. Tries Edge API Gateway (http://localhost:8080/api/v1/auth/...)
- * 2. If Gateway is not running, falls back directly to Auth-Service (http://localhost:8082/api/v1/auth/...)
+ * 2. If Gateway fails, falls back directly to Auth-Service (http://localhost:8082/api/v1/auth/...)
  */
-export const postAuthApi = async (endpoint: string, payload: any): Promise<Response> => {
+export const postAuthApi = async (endpoint: string, payload?: any): Promise<Response> => {
   const gatewayUrl = endpoint.startsWith("http") ? endpoint : `${GATEWAY_URL}${endpoint}`;
+  const options: RequestInit = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    ...(payload ? { body: JSON.stringify(payload) } : {}),
+  };
 
   try {
-    return await fetch(gatewayUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    return await fetch(gatewayUrl, options);
   } catch (err: any) {
     const directUrl = `${AUTH_SERVICE_DIRECT_URL}${endpoint}`;
-    console.warn(`Gateway call to ${gatewayUrl} failed (${err.message}). Falling back to direct Auth-Service at ${directUrl}`);
+    console.warn(`Gateway connection failed. Falling back to direct Auth-Service at ${directUrl}`);
+    return fetch(directUrl, options);
+  }
+};
 
-    return fetch(directUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+export const putAuthApi = async (endpoint: string, payload: any): Promise<Response> => {
+  const gatewayUrl = endpoint.startsWith("http") ? endpoint : `${GATEWAY_URL}${endpoint}`;
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (inMemoryToken) {
+    headers.set("Authorization", `Bearer ${inMemoryToken}`);
+  }
+
+  const options: RequestInit = {
+    method: "PUT",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(payload),
+  };
+
+  try {
+    return await fetch(gatewayUrl, options);
+  } catch (err: any) {
+    const directUrl = `${AUTH_SERVICE_DIRECT_URL}${endpoint}`;
+    console.warn(`Gateway connection failed. Falling back to direct Auth-Service at ${directUrl}`);
+    return fetch(directUrl, options);
   }
 };
 
 /**
- * Wrapper around fetch that automatically appends the Bearer token
- * in the Authorization header when targeting Gateway endpoints.
+ * Wrapper around fetch that automatically appends the in-memory Bearer token
+ * and credentials: 'include' for HttpOnly cookie authentication.
  */
 export const fetchWithAuth = async (endpoint: string, options: RequestInit = {}): Promise<Response> => {
-  const token = getAuthToken();
+  const token = getMemoryToken();
   const headers = new Headers(options.headers || {});
 
   if (token) {
@@ -126,5 +118,5 @@ export const fetchWithAuth = async (endpoint: string, options: RequestInit = {})
   }
 
   const url = endpoint.startsWith("http") ? endpoint : `${GATEWAY_URL}${endpoint}`;
-  return fetch(url, { ...options, headers });
+  return fetch(url, { ...options, headers, credentials: "include" });
 };

@@ -188,89 +188,102 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       <Toaster position="top-right" richColors />
       <div className="h-full w-full">
         <div className="bg-card shadow-lg h-full">
-          {/* Header */}
-          <header className="flex items-center justify-between p-4 border-b border-border">
+          {/* Glassmorphic Header Top Bar */}
+          <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-xl border-b border-border/80 px-4 md:px-6 py-3 flex items-center justify-between shadow-xs">
             <div className="flex items-center space-x-3">
               <div id="mobile-sidebar-toggle">
                 <MobileSidebarToggle onToggle={setMobileSidebarOpen} isOpen={mobileSidebarOpen} />
               </div>
-              <div className="flex items-center space-x-2">
-                <Waves className="h-6 w-6 text-emerald-500" />
-                <h1 className="text-green-500 font-bold text-xl">Wave</h1>
+              <div className="flex items-center space-x-2.5">
+                <div className="h-8.5 w-8.5 rounded-lg bg-gradient-to-tr from-emerald-500 to-teal-400 p-0.5 shadow-md shadow-emerald-500/20 flex items-center justify-center">
+                  <div className="h-full w-full bg-slate-950 rounded-md flex items-center justify-center">
+                    <Waves className="h-4.5 w-4.5 text-emerald-400" />
+                  </div>
+                </div>
+                <h1 className="font-extrabold text-xl tracking-tight text-foreground">
+                  Wave
+                </h1>
               </div>
             </div>
 
+            {/* Global Market & Asset Quick Search */}
             <HeaderSearch />
 
-            <div className="flex items-center space-x-5">
+            {/* Right Actions: Notifications & User Account */}
+            <div className="flex items-center space-x-4">
               <div className="relative" ref={notificationDropdownRef}>
                 <button
-                  className="relative p-1.5 rounded-full hover:bg-muted focus:outline-none transition-colors"
+                  className="relative p-2 rounded-full hover:bg-muted focus:outline-none transition-colors border border-border/40"
                   onClick={() => setNotificationDropdownOpen(!notificationDropdownOpen)}
                   aria-label="Notifications"
                 >
-                  <Bell className="h-6 w-6 text-foreground" />
+                  <Bell className="h-5 w-5 text-foreground" />
                   {riskReports.length > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-emerald-500 text-slate-950 font-extrabold text-xs rounded-full h-5 w-5 flex items-center justify-center animate-bounce">
+                    <span className="absolute -top-1 -right-1 bg-emerald-500 text-slate-950 font-black text-[10px] rounded-full h-4.5 w-4.5 flex items-center justify-center shadow-md animate-pulse">
                       {riskReports.length}
                     </span>
                   )}
                 </button>
 
+                {/* Notifications Dropdown Card */}
                 {notificationDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-card rounded-lg shadow-lg border border-border z-50 animate-in fade-in slide-in-from-top-5 duration-200">
-                    <div className="p-3 border-b border-border">
+                  <div className="absolute right-0 mt-2 w-80 md:w-96 bg-card rounded-2xl shadow-2xl border border-border z-50 overflow-hidden animate-in fade-in slide-in-from-top-3 duration-200">
+                    <div className="p-4 border-b border-border/80 bg-muted/20">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-medium">Notifications</h3>
                         <div className="flex items-center space-x-2">
-                          <span
+                          <h3 className="font-bold text-sm text-foreground">Notifications</h3>
+                          {riskReports.length > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                              {riskReports.length} New
+                            </span>
+                          )}
+                        </div>
+                        {riskReports.length > 0 && (
+                          <button
                             onClick={() => setRiskReports([])}
-                            className="text-xs text-primary hover:text-primary/90 cursor-pointer"
+                            className="text-xs text-primary hover:text-primary/90 font-medium transition-colors"
                           >
                             Clear all
-                          </span>
-                        </div>
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="max-h-[350px] overflow-y-auto">
+                    <div className="max-h-[380px] overflow-y-auto divide-y divide-border/40">
                       {riskReports.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">No new notifications</div>
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                          No new risk audit notifications
+                        </div>
                       ) : (
                         riskReports.map((report) => (
                           <div
                             key={report.id}
-                            className="p-3 border-b border-border hover:bg-muted/50 transition-colors animate-in fade-in slide-in-from-top-2 duration-300"
+                            className="p-4 hover:bg-muted/40 transition-colors animate-in fade-in slide-in-from-top-2 duration-300"
                           >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-semibold text-foreground">{report.title}</span>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-sm font-bold text-foreground">{report.title}</span>
                               <span
-                                className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${report.level === "Elevated"
-                                    ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                                className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${report.level === "Elevated"
+                                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
                                     : report.level === "Moderate"
-                                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                   }`}
                               >
                                 {report.level} risk
                               </span>
                             </div>
                             <p className="text-xs text-muted-foreground leading-relaxed">{report.detail}</p>
-                            <span className="text-[10px] text-muted-foreground/70 mt-1 block">{report.time}</span>
+                            <span className="text-[10px] text-muted-foreground/60 mt-1.5 block font-mono">{report.time}</span>
                           </div>
                         ))
                       )}
-                    </div>
-
-                    <div className="p-2 border-t border-border text-center">
-                      <button className="text-sm text-primary hover:text-primary/90 font-medium">
-                        View all notifications
-                      </button>
                     </div>
                   </div>
                 )}
               </div>
 
+              {/* User Account Avatar Dropdown */}
               <AccountDropdown />
             </div>
           </header>
