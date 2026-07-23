@@ -1,6 +1,6 @@
 "use client"
 
-import { Wallet, BarChart2, Settings, MessageSquare } from "lucide-react"
+import { Wallet, Settings, ArrowLeftRight } from "lucide-react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 
@@ -17,20 +17,11 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
     }
   }
 
-  // Update the isActive function to check for the statistics and settings paths
   const isActive = (path: string) => {
-    if (path === "/dashboard" && pathname === "/dashboard") {
-      return true
-    }
-    if (path === "/statistics" && pathname === "/statistics") {
-      return true
-    }
-    if (path === "/settings" && pathname === "/settings") {
-      return true
-    }
-    if (path === "/chat" && pathname === "/chat") {
-      return true
-    }
+    if (path === "/dashboard" && pathname === "/dashboard") return true
+    if (path === "/wallet" && pathname === "/wallet") return true
+    if (path === "/swap" && pathname === "/swap") return true
+    if (path === "/settings" && pathname === "/settings") return true
     return pathname === path
   }
 
@@ -84,35 +75,18 @@ export default function SideNavigation({ onCloseMobile }: SideNavigationProps) {
           </li>
           <li>
             <Link
-              href="/statistics"
+              href="/swap"
               onClick={handleClick}
               className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${
-                isActive("/statistics") ? "text-primary" : "text-muted-foreground"
+                isActive("/swap") ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <BarChart2 className="h-5 w-5 mr-3 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
+              <ArrowLeftRight className="h-5 w-5 mr-3 transition-transform duration-200 group-hover:scale-110 group-active:scale-95 text-emerald-500" />
               <span className="transition-all duration-200 group-hover:translate-x-1 group-active:translate-x-0">
-                Statistics
+                Swap
               </span>
               <span
-                className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-primary rounded-r transition-all duration-200 ${isActive("/statistics") ? "h-4/5" : "group-hover:h-4/5"}`}
-              ></span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/chat"
-              onClick={handleClick}
-              className={`flex items-center w-full px-6 py-2 font-medium relative group transition-all duration-200 hover:bg-primary/10 active:bg-primary/20 rounded-md ${
-                isActive("/chat") ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              <MessageSquare className="h-5 w-5 mr-3 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
-              <span className="transition-all duration-200 group-hover:translate-x-1 group-active:translate-x-0">
-                AI Chat
-              </span>
-              <span
-                className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-primary rounded-r transition-all duration-200 ${isActive("/chat") ? "h-4/5" : "group-hover:h-4/5"}`}
+                className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-primary rounded-r transition-all duration-200 ${isActive("/swap") ? "h-4/5" : "group-hover:h-4/5"}`}
               ></span>
             </Link>
           </li>

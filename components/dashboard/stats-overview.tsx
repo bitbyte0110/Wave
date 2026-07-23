@@ -1,17 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { TrendingUp, TrendingDown } from "lucide-react"
-import { GATEWAY_URL } from "@/lib/auth"
+import { useMarketStream } from "@/context/market-context"
+import { getWalletBalanceCache } from "@/lib/wallet-cache"
 
-interface MarketOverviewData {
-  globalMarketCapUsd: number
-  totalVolume24hUsd: number
-  btcDominancePct: number
-  btcUsd: number
-  btc24hPct: number
-  cachedAtMs: number
-}
+const BTC_MOCK_PRICE = 68059.49
 
 function formatCompactUsd(value: number): string {
   if (!value || isNaN(value)) return "--"
@@ -28,48 +21,12 @@ function formatCompactUsd(value: number): string {
 }
 
 export default function StatsOverview() {
-  const [overview, setOverview] = useState<MarketOverviewData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { overview } = useMarketStream()
+  const walletCache = getWalletBalanceCache()
 
-  useEffect(() => {
-    let isMounted = true
-
-    async function fetchOverview() {
-      const primaryUrl = `${GATEWAY_URL}/api/v1/market/overview`
-      const fallbackUrl = "http://localhost:8081/api/v1/market/overview"
-
-      try {
-        let res = await fetch(primaryUrl).catch(() => null)
-        if (!res || !res.ok) {
-          res = await fetch(fallbackUrl).catch(() => null)
-        }
-
-        if (res && res.ok && isMounted) {
-          const data = await res.json()
-          setOverview({
-            globalMarketCapUsd: Number(data.globalMarketCapUsd || 0),
-            totalVolume24hUsd: Number(data.totalVolume24hUsd || 0),
-            btcDominancePct: Number(data.btcDominancePct || 0),
-            btcUsd: Number(data.btcUsd || 0),
-            btc24hPct: Number(data.btc24hPct || 0),
-            cachedAtMs: Number(data.cachedAtMs || Date.now()),
-          })
-        }
-      } catch (err) {
-        console.warn("Failed to fetch market overview:", err)
-      } finally {
-        if (isMounted) setIsLoading(false)
-      }
-    }
-
-    fetchOverview()
-    const interval = setInterval(fetchOverview, 60000)
-
-    return () => {
-      isMounted = false
-      clearInterval(interval)
-    }
-  }, [])
+  const usdcVal = walletCache ? walletCache.usdcBalance : 0
+  const btcVal = walletCache ? walletCache.btcBalance : 0
+  const totalUsd = usdcVal + btcVal * BTC_MOCK_PRICE
 
   const stats = [
     {
@@ -104,12 +61,11 @@ export default function StatsOverview() {
         >
           <div>
             <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">{stat.label}</p>
-            <h3 className="text-2xl font-bold mt-1.5">{isLoading && !overview ? "..." : stat.value}</h3>
+            <h3 className="text-2xl font-bold mt-1.5">{!overview ? "..." : stat.value}</h3>
           </div>
           <div
-            className={`flex items-center gap-1.5 text-xs mt-3 font-semibold ${
-              stat.up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-            }`}
+            className={`flex items-center gap-1.5 text-xs mt-3 font-semibold ${stat.up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+              }`}
           >
             {stat.up ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
             {stat.change} <span className="text-muted-foreground font-normal">{stat.caption}</span>
@@ -121,11 +77,13 @@ export default function StatsOverview() {
       <div className="bg-primary/5 border border-primary/30 rounded-lg p-5 flex flex-col justify-between shadow-sm">
         <div>
           <p className="text-xs text-primary font-semibold uppercase tracking-wider">Your Balance</p>
-          <h3 className="text-2xl font-bold mt-1.5">$12,500.00</h3>
+          <h3 className="text-2xl font-bold mt-1.5">
+            ${totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </h3>
         </div>
         <div className="flex items-center justify-between text-xs mt-3 font-medium text-muted-foreground">
-          <span>Includes 2.1005 BTC</span>
-          <span className="bg-primary/15 text-primary px-2 py-0.5 rounded text-[10px] font-semibold">USDC</span>
+          <span>{btcVal > 0 ? `Includes ${btcVal.toFixed(4)} BTC` : `USDC Ledger`}</span>
+          <span className="bg-primary/15 text-primary px-2 py-0.5 rounded text-[10px] font-semibold">Active</span>
         </div>
       </div>
     </div>

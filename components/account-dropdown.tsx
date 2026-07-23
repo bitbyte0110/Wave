@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { User, LogOut, Settings, UserCircle, CreditCard, HelpCircle } from "lucide-react"
+import { User, LogOut, Settings, UserCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { getAuthUser, clearAuthSession, UserSession } from "@/lib/auth"
 
@@ -32,6 +32,11 @@ export default function AccountDropdown() {
   const handleSignOut = () => {
     clearAuthSession()
     router.push("/login")
+  }
+
+  const navigateToSettings = () => {
+    setIsOpen(false)
+    router.push("/settings")
   }
 
   return (
@@ -65,21 +70,19 @@ export default function AccountDropdown() {
           </div>
 
           <div className="py-1">
-            <button className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors duration-150">
+            <button
+              onClick={navigateToSettings}
+              className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors duration-150"
+            >
               <UserCircle className="h-4 w-4 mr-3 text-muted-foreground" />
               My Profile
             </button>
-            <button className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors duration-150">
-              <CreditCard className="h-4 w-4 mr-3 text-muted-foreground" />
-              Billing
-            </button>
-            <button className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors duration-150">
+            <button
+              onClick={navigateToSettings}
+              className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors duration-150"
+            >
               <Settings className="h-4 w-4 mr-3 text-muted-foreground" />
               Settings
-            </button>
-            <button className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors duration-150">
-              <HelpCircle className="h-4 w-4 mr-3 text-muted-foreground" />
-              Help Center
             </button>
           </div>
 

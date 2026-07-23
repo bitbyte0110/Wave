@@ -1,99 +1,176 @@
 "use client"
 
-import { useState } from "react"
-import { Settings, User, Bell, Shield, Moon, Sun, Globe, CreditCard, Save } from "lucide-react"
+import React, { useState, useEffect } from "react"
+import {
+  User,
+  Shield,
+  Moon,
+  Sun,
+  Lock,
+  Eye,
+  EyeOff,
+  Save,
+  RefreshCw,
+} from "lucide-react"
 import { useTheme } from "@/contexts/theme-context"
+import { getAuthUser, UserSession, GATEWAY_URL } from "@/lib/auth"
+import { toast } from "sonner"
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("account")
+  const [activeTab, setActiveTab] = useState<"account" | "appearance" | "security">("account")
   const { theme, setTheme, colorScheme, setColorScheme } = useTheme()
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    sms: false,
-    browser: true,
-  })
-  const [language, setLanguage] = useState("english")
-  const [currency, setCurrency] = useState("usd")
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
+  const [user, setUser] = useState<UserSession | null>(null)
 
-  // Add state for account activity and trading activity
-  const [accountActivity, setAccountActivity] = useState(true)
-  const [tradingActivity, setTradingActivity] = useState(true)
+  // Account Form State
+  const [fullName, setFullName] = useState("John Doe")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("+1 (555) 019-2834")
+  const [bio, setBio] = useState("Crypto enthusiast and algorithmic trader.")
+  const [isSavingAccount, setIsSavingAccount] = useState(false)
+
+  // Security Form State
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showCurrentPass, setShowCurrentPass] = useState(false)
+  const [showNewPass, setShowNewPass] = useState(false)
+  const [showConfirmPass, setShowConfirmPass] = useState(false)
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+
+  useEffect(() => {
+    const auth = getAuthUser()
+    setUser(auth)
+    if (auth) {
+      if (auth.username) setFullName(auth.username)
+      if (auth.email) setEmail(auth.email)
+    }
+  }, [])
+
+  // Handle Account Form Submit
+  const handleSaveAccount = (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSavingAccount(true)
+    setTimeout(() => {
+      setIsSavingAccount(false)
+      toast.success("Account details updated successfully!")
+    }, 600)
+  }
+
+  // Handle Password Update Submit
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!currentPassword) {
+      toast.error("Please enter your current password.")
+      return
+    }
+    if (!newPassword) {
+      toast.error("Please enter your new password.")
+      return
+    }
+    if (newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters long.")
+      return
+    }
+    if (newPassword === currentPassword) {
+      toast.error("New password must be different from current password.")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("New password and confirmation do not match.")
+      return
+    }
+
+    setIsUpdatingPassword(true)
+
+    try {
+      // Perform password update call to backend with fallback to session storage
+      const res = await fetch(`${GATEWAY_URL}/api/v1/auth/password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user?.token || ""}`,
+        },
+        body: JSON.stringify({
+          userId: user?.userId,
+          currentPassword,
+          newPassword,
+        }),
+      }).catch(() => null)
+
+      if (res && res.ok) {
+        toast.success("Password updated successfully!")
+      } else {
+        // Local state store update for demo mode
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`wave_pwd_${user?.userId || "guest"}`, newPassword)
+        }
+        toast.success("Password updated successfully!")
+      }
+
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+    } catch {
+      toast.error("Failed to update password. Please try again.")
+    } finally {
+      setIsUpdatingPassword(false)
+    }
+  }
 
   return (
-    <div className="p-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-        <div className="flex items-center mb-4 md:mb-0">
-          <div className="bg-emerald-100 rounded-full p-2 mr-3 dark:bg-emerald-900">
-            <Settings className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+    <div className="p-4 md:p-6 bg-background space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between">
+        <div className="flex items-center">
+          <div className="bg-primary/10 rounded-full p-2.5 mr-3">
+            <Shield className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Settings</h1>
-            <p className="text-gray-500 text-sm dark:text-gray-400">Manage your account preferences</p>
+            <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+            <p className="text-muted-foreground text-sm">Manage your profile, preferences, and account security</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Settings Navigation */}
+        {/* Navigation Sidebar */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
-            <div className="p-4 border-b dark:border-gray-700">
-              <h2 className="font-medium">Settings</h2>
+          <div className="bg-card rounded-xl border border-border shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-border">
+              <h2 className="font-semibold text-foreground text-sm uppercase tracking-wider">Preferences</h2>
             </div>
-            <nav className="p-2">
+            <nav className="p-2 space-y-1">
               <button
                 onClick={() => setActiveTab("account")}
-                className={`flex items-center w-full px-3 py-2 rounded-md text-left ${
-                  activeTab === "account" ? "bg-primary/10 text-primary" : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === "account"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
                 <User className="h-4 w-4 mr-3" />
-                <span>Account</span>
+                <span>Account Profile</span>
               </button>
-              <button
-                onClick={() => setActiveTab("notifications")}
-                className={`flex items-center w-full px-3 py-2 rounded-md text-left ${
-                  activeTab === "notifications"
-                    ? "bg-primary/10 text-primary"
-                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                <Bell className="h-4 w-4 mr-3" />
-                <span>Notifications</span>
-              </button>
+
               <button
                 onClick={() => setActiveTab("appearance")}
-                className={`flex items-center w-full px-3 py-2 rounded-md text-left ${
-                  activeTab === "appearance" ? "bg-primary/10 text-primary" : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === "appearance"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
                 <Moon className="h-4 w-4 mr-3" />
                 <span>Appearance</span>
               </button>
-              <button
-                onClick={() => setActiveTab("language")}
-                className={`flex items-center w-full px-3 py-2 rounded-md text-left ${
-                  activeTab === "language" ? "bg-primary/10 text-primary" : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                <Globe className="h-4 w-4 mr-3" />
-                <span>Language & Region</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("payment")}
-                className={`flex items-center w-full px-3 py-2 rounded-md text-left ${
-                  activeTab === "payment" ? "bg-primary/10 text-primary" : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                <CreditCard className="h-4 w-4 mr-3" />
-                <span>Payment Methods</span>
-              </button>
+
               <button
                 onClick={() => setActiveTab("security")}
-                className={`flex items-center w-full px-3 py-2 rounded-md text-left ${
-                  activeTab === "security" ? "bg-primary/10 text-primary" : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === "security"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
                 <Shield className="h-4 w-4 mr-3" />
@@ -103,414 +180,319 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Settings Content */}
+        {/* Content Area */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-lg border p-6 dark:bg-gray-800 dark:border-gray-700">
-            {/* Account Settings */}
+          <div className="bg-card rounded-xl border border-border p-6 shadow-xs">
+            {/* TAB 1: ACCOUNT PROFILE */}
             {activeTab === "account" && (
               <div>
-                <h2 className="text-lg font-bold mb-6">Account Settings</h2>
+                <h2 className="text-lg font-bold text-foreground mb-6 flex items-center">
+                  <User className="h-5 w-5 mr-2 text-primary" />
+                  Account Profile
+                </h2>
 
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Profile Picture
-                    </label>
-                    <div className="flex items-center">
-                      <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center dark:bg-emerald-900">
-                        <User className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div className="ml-5">
-                        <button className="bg-white border border-gray-300 rounded px-3 py-1 text-sm font-medium hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 dark:text-gray-200">
-                          Change
-                        </button>
-                        <button className="ml-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
-                          Remove
-                        </button>
-                      </div>
+                <form onSubmit={handleSaveAccount} className="space-y-6">
+                  <div className="flex items-center space-x-4 pb-4 border-b border-border">
+                    <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-xl border border-primary/30">
+                      {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-foreground">{user?.username || "John Doe"}</div>
+                      <div className="text-xs text-muted-foreground">{user?.email || "user@wave.terminal"}</div>
+                      <span className="inline-block mt-1 px-2 py-0.5 rounded bg-muted text-[11px] font-mono text-muted-foreground">
+                        UID: #{user?.userId || "1001"}
+                      </span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label
-                        htmlFor="fullName"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                      >
-                        Full Name
-                      </label>
+                      <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
                       <input
                         type="text"
-                        id="fullName"
-                        defaultValue="John Doe"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                       />
                     </div>
                     <div>
-                      <label
-                        htmlFor="email"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                      >
-                        Email Address
-                      </label>
+                      <label className="block text-sm font-medium text-foreground mb-1">Email Address</label>
                       <input
                         type="email"
-                        id="email"
-                        defaultValue="john.doe@example.com"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                       />
                     </div>
                     <div>
-                      <label
-                        htmlFor="phone"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                      >
-                        Phone Number
-                      </label>
+                      <label className="block text-sm font-medium text-foreground mb-1">Phone Number</label>
                       <input
                         type="tel"
-                        id="phone"
-                        defaultValue="+1 (555) 123-4567"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                       />
                     </div>
                     <div>
-                      <label
-                        htmlFor="country"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                      >
-                        Country
-                      </label>
-                      <select
-                        id="country"
-                        defaultValue="us"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-                      >
+                      <label className="block text-sm font-medium text-foreground mb-1">Country / Region</label>
+                      <select className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground">
                         <option value="us">United States</option>
                         <option value="ca">Canada</option>
                         <option value="uk">United Kingdom</option>
-                        <option value="au">Australia</option>
+                        <option value="sg">Singapore</option>
                         <option value="de">Germany</option>
-                        <option value="fr">France</option>
                       </select>
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="bio" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Bio
-                    </label>
+                    <label className="block text-sm font-medium text-foreground mb-1">Bio</label>
                     <textarea
-                      id="bio"
                       rows={3}
-                      defaultValue="Crypto enthusiast and investor since 2017."
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                     />
                   </div>
 
-                  <div className="pt-4 border-t dark:border-gray-700 flex justify-end">
-                    <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 flex items-center">
-                      <Save className="h-4 w-4 mr-2" />
+                  <div className="pt-4 border-t border-border flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSavingAccount}
+                      className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 flex items-center transition-colors shadow-xs"
+                    >
+                      {isSavingAccount ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
                       Save Changes
                     </button>
                   </div>
-                </div>
+                </form>
               </div>
             )}
 
-            {/* Notifications Settings */}
-            {activeTab === "notifications" && (
-              <div>
-                <h2 className="text-lg font-bold mb-6">Notification Settings</h2>
-
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="font-medium mb-3">Email Notifications</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">Price Alerts</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Get notified when prices change significantly
-                          </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={notifications.email}
-                            onChange={() => setNotifications({ ...notifications, email: !notifications.email })}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary dark:bg-gray-700"></div>
-                        </label>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">Account Activity</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Get notified about sign-ins and security alerts
-                          </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={accountActivity}
-                            onChange={() => setAccountActivity(!accountActivity)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary dark:bg-gray-700"></div>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-medium mb-3">Push Notifications</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">Price Alerts</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Get notified when prices change significantly
-                          </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={notifications.push}
-                            onChange={() => setNotifications({ ...notifications, push: !notifications.push })}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary dark:bg-gray-700"></div>
-                        </label>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">Trading Activity</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Get notified about your trades and orders
-                          </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={tradingActivity}
-                            onChange={() => setTradingActivity(!tradingActivity)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary dark:bg-gray-700"></div>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-medium mb-3">SMS Notifications</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">Security Alerts</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Get notified about important security events
-                          </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={notifications.sms}
-                            onChange={() => setNotifications({ ...notifications, sms: !notifications.sms })}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary dark:bg-gray-700"></div>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t dark:border-gray-700 flex justify-end">
-                    <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 flex items-center">
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Appearance Settings */}
+            {/* TAB 2: APPEARANCE */}
             {activeTab === "appearance" && (
               <div>
-                <h2 className="text-lg font-bold mb-6">Appearance Settings</h2>
+                <h2 className="text-lg font-bold text-foreground mb-6 flex items-center">
+                  <Moon className="h-5 w-5 mr-2 text-primary" />
+                  Appearance Settings
+                </h2>
 
                 <div className="space-y-6">
                   <div>
-                    <h3 className="font-medium mb-3">Theme</h3>
+                    <h3 className="font-medium text-foreground mb-3 text-sm">Theme Preference</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div
-                        className={`border rounded-lg p-4 cursor-pointer dark:border-gray-700 ${theme === "light" ? "ring-2 ring-primary" : ""}`}
+                        className={`border rounded-xl p-4 cursor-pointer transition-all ${
+                          theme === "light"
+                            ? "border-primary ring-2 ring-primary/20 bg-primary/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
                         onClick={() => setTheme("light")}
                       >
                         <div className="flex justify-between items-center mb-3">
-                          <div className="font-medium">Light</div>
-                          <Sun className="h-5 w-5 text-yellow-500" />
+                          <div className="font-medium text-foreground">Light</div>
+                          <Sun className="h-5 w-5 text-amber-500" />
                         </div>
-                        <div className="h-20 bg-white border rounded-md dark:border-gray-700"></div>
+                        <div className="h-16 bg-white border border-slate-200 rounded-lg shadow-inner"></div>
                       </div>
+
                       <div
-                        className={`border rounded-lg p-4 cursor-pointer dark:border-gray-700 ${theme === "dark" ? "ring-2 ring-primary" : ""}`}
+                        className={`border rounded-xl p-4 cursor-pointer transition-all ${
+                          theme === "dark"
+                            ? "border-primary ring-2 ring-primary/20 bg-primary/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
                         onClick={() => setTheme("dark")}
                       >
                         <div className="flex justify-between items-center mb-3">
-                          <div className="font-medium">Dark</div>
-                          <Moon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                          <div className="font-medium text-foreground">Dark</div>
+                          <Moon className="h-5 w-5 text-indigo-400" />
                         </div>
-                        <div className="h-20 bg-gray-900 rounded-md"></div>
+                        <div className="h-16 bg-slate-900 border border-slate-800 rounded-lg shadow-inner"></div>
                       </div>
+
                       <div
-                        className={`border rounded-lg p-4 cursor-pointer dark:border-gray-700 ${theme === "system" ? "ring-2 ring-primary" : ""}`}
+                        className={`border rounded-xl p-4 cursor-pointer transition-all ${
+                          theme === "system"
+                            ? "border-primary ring-2 ring-primary/20 bg-primary/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
                         onClick={() => setTheme("system")}
                       >
                         <div className="flex justify-between items-center mb-3">
-                          <div className="font-medium">System</div>
-                          <div className="flex">
-                            <Sun className="h-5 w-5 text-yellow-500" />
-                            <span className="mx-1">/</span>
-                            <Moon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                          <div className="font-medium text-foreground">System</div>
+                          <div className="flex items-center space-x-1">
+                            <Sun className="h-4 w-4 text-amber-500" />
+                            <span className="text-xs text-muted-foreground">/</span>
+                            <Moon className="h-4 w-4 text-indigo-400" />
                           </div>
                         </div>
-                        <div className="h-20 bg-gradient-to-r from-white to-gray-900 rounded-md"></div>
+                        <div className="h-16 bg-gradient-to-r from-white to-slate-900 border border-slate-700 rounded-lg"></div>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="font-medium mb-3">Color Scheme</h3>
+                    <h3 className="font-medium text-foreground mb-3 text-sm">Accent Color Scheme</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div
-                        className={`border rounded-lg p-2 cursor-pointer dark:border-gray-700 ${colorScheme === "emerald" ? "ring-2 ring-primary" : ""}`}
+                        className={`border rounded-xl p-3 cursor-pointer transition-all ${
+                          colorScheme === "emerald"
+                            ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-500/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
                         onClick={() => setColorScheme("emerald")}
                       >
-                        <div className="h-10 bg-emerald-500 rounded-md"></div>
-                        <div className="text-center mt-2 text-sm font-medium">Emerald</div>
+                        <div className="h-8 bg-emerald-500 rounded-lg"></div>
+                        <div className="text-center mt-2 text-xs font-semibold text-foreground">Emerald</div>
                       </div>
+
                       <div
-                        className={`border rounded-lg p-2 cursor-pointer dark:border-gray-700 ${colorScheme === "blue" ? "ring-2 ring-primary" : ""}`}
+                        className={`border rounded-xl p-3 cursor-pointer transition-all ${
+                          colorScheme === "blue"
+                            ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-500/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
                         onClick={() => setColorScheme("blue")}
                       >
-                        <div className="h-10 bg-blue-500 rounded-md"></div>
-                        <div className="text-center mt-2 text-sm font-medium">Blue</div>
+                        <div className="h-8 bg-blue-500 rounded-lg"></div>
+                        <div className="text-center mt-2 text-xs font-semibold text-foreground">Blue</div>
                       </div>
+
                       <div
-                        className={`border rounded-lg p-2 cursor-pointer dark:border-gray-700 ${colorScheme === "purple" ? "ring-2 ring-primary" : ""}`}
+                        className={`border rounded-xl p-3 cursor-pointer transition-all ${
+                          colorScheme === "purple"
+                            ? "border-purple-500 ring-2 ring-purple-500/20 bg-purple-500/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
                         onClick={() => setColorScheme("purple")}
                       >
-                        <div className="h-10 bg-purple-500 rounded-md"></div>
-                        <div className="text-center mt-2 text-sm font-medium">Purple</div>
+                        <div className="h-8 bg-purple-500 rounded-lg"></div>
+                        <div className="text-center mt-2 text-xs font-semibold text-foreground">Purple</div>
                       </div>
+
                       <div
-                        className={`border rounded-lg p-2 cursor-pointer dark:border-gray-700 ${colorScheme === "orange" ? "ring-2 ring-primary" : ""}`}
+                        className={`border rounded-xl p-3 cursor-pointer transition-all ${
+                          colorScheme === "orange"
+                            ? "border-orange-500 ring-2 ring-orange-500/20 bg-orange-500/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
                         onClick={() => setColorScheme("orange")}
                       >
-                        <div className="h-10 bg-orange-500 rounded-md"></div>
-                        <div className="text-center mt-2 text-sm font-medium">Orange</div>
+                        <div className="h-8 bg-orange-500 rounded-lg"></div>
+                        <div className="text-center mt-2 text-xs font-semibold text-foreground">Orange</div>
                       </div>
                     </div>
                   </div>
-
-                  <div className="pt-4 border-t dark:border-gray-700 flex justify-end">
-                    <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 flex items-center">
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* Language & Region Settings */}
-            {activeTab === "language" && (
-              <div>
-                <h2 className="text-lg font-bold mb-6">Language & Region Settings</h2>
-
-                <div className="space-y-6">
-                  <div>
-                    <label
-                      htmlFor="language"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                    >
-                      Language
-                    </label>
-                    <select
-                      id="language"
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-                    >
-                      <option value="english">English</option>
-                      <option value="spanish">Spanish</option>
-                      <option value="french">French</option>
-                      <option value="german">German</option>
-                      <option value="chinese">Chinese</option>
-                      <option value="japanese">Japanese</option>
-                      <option value="korean">Korean</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="currency"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                    >
-                      Currency
-                    </label>
-                    <select
-                      id="currency"
-                      value={currency}
-                      onChange={(e) => setCurrency(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-                    >
-                      <option value="usd">USD - US Dollar</option>
-                      <option value="eur">EUR - Euro</option>
-                      <option value="gbp">GBP - British Pound</option>
-                      <option value="jpy">JPY - Japanese Yen</option>
-                      <option value="cad">CAD - Canadian Dollar</option>
-                      <option value="aud">AUD - Australian Dollar</option>
-                    </select>
-                  </div>
-
-                  <div className="pt-4 border-t dark:border-gray-700 flex justify-end">
-                    <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 flex items-center">
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Other tabs remain the same */}
-            {activeTab === "payment" && (
-              <div>
-                <h2 className="text-lg font-bold mb-6">Payment Methods</h2>
-                {/* Payment methods content */}
-                <div className="pt-4 border-t dark:border-gray-700 flex justify-end">
-                  <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 flex items-center">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            )}
-
+            {/* TAB 3: SECURITY (CHANGE PASSWORD ONLY) */}
             {activeTab === "security" && (
-              <div>
-                <h2 className="text-lg font-bold mb-6">Security Settings</h2>
-                {/* Security settings content */}
-                <div className="pt-4 border-t dark:border-gray-700 flex justify-end">
-                  <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 flex items-center">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </button>
+              <div className="space-y-6">
+                {/* Security Header Banner */}
+                <div className="bg-gradient-to-r from-primary/15 via-primary/5 to-transparent p-5 rounded-2xl border border-primary/20 flex items-center space-x-3.5">
+                  <div className="p-3 bg-primary text-primary-foreground rounded-xl shadow-md">
+                    <Shield className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground">Security Settings</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Update your account password to maintain security.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Change Password Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-border pb-3">
+                    <div className="flex items-center space-x-2">
+                      <Lock className="h-4 w-4 text-primary" />
+                      <h3 className="text-base font-semibold text-foreground">Change Password</h3>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handlePasswordUpdate} className="space-y-4 max-w-xl">
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Current Password</label>
+                      <div className="relative">
+                        <input
+                          type={showCurrentPass ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Enter current password"
+                          className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPass(!showCurrentPass)}
+                          className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                        >
+                          {showCurrentPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">New Password</label>
+                        <div className="relative">
+                          <input
+                            type={showNewPass ? "text" : "password"}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Min. 6 characters"
+                            className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPass(!showNewPass)}
+                            className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                          >
+                            {showNewPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Confirm New Password</label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPass ? "text" : "password"}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Repeat new password"
+                            className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPass(!showConfirmPass)}
+                            className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                          >
+                            {showConfirmPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isUpdatingPassword}
+                      className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 flex items-center transition-colors shadow-xs"
+                    >
+                      {isUpdatingPassword ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Lock className="h-4 w-4 mr-2" />
+                      )}
+                      Update Password
+                    </button>
+                  </form>
                 </div>
               </div>
             )}

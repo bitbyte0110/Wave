@@ -1,114 +1,156 @@
 "use client"
 
-import { useState } from "react"
-import { MoreVertical } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { GATEWAY_URL, getAuthUser } from "@/lib/auth"
+import { getWalletBalanceCache, setWalletBalanceCache, CachedWalletBalance } from "@/lib/wallet-cache"
+
+const BTC_MOCK_PRICE = 68059.49
 
 export default function AssetDistribution() {
   const [showPercentage, setShowPercentage] = useState(true)
+  const [balanceData, setBalanceData] = useState<CachedWalletBalance | null>(() => getWalletBalanceCache())
+  const [isLoading, setIsLoading] = useState(false)
 
-  const assets = [
-    { name: "Bitcoin", symbol: "BTC", color: "bg-orange-500", percentage: 68 },
-    { name: "Ethereum", symbol: "ETH", color: "bg-blue-500", percentage: 26 },
-    { name: "Litecoin", symbol: "LTC", color: "bg-gray-500", percentage: 4 },
-    { name: "Ripple", symbol: "XRP", color: "bg-gray-700", percentage: 2 },
-  ]
+  const fetchBalance = useCallback(async () => {
+    setIsLoading(true)
+    const user = getAuthUser()
+    const userId = user?.userId || 42
+
+    const primaryUrl = `${GATEWAY_URL}/api/v1/wallet/balance/${userId}`
+    const fallbackUrl = `http://localhost:8084/api/v1/wallet/balance/${userId}`
+
+    try {
+      let res = await fetch(primaryUrl).catch(() => null)
+      if (!res || !res.ok) {
+        res = await fetch(fallbackUrl).catch(() => null)
+      }
+
+      if (res && res.ok) {
+        const data = await res.json()
+        const parsed = {
+          userId: Number(data.userId || userId),
+          usdcBalance: Number(data.usdcBalance || 0),
+          btcBalance: Number(data.btcBalance || 0),
+        }
+        setBalanceData({ ...parsed, cachedAt: Date.now() })
+        setWalletBalanceCache(parsed)
+      }
+    } catch (err) {
+      console.warn("Failed to fetch asset distribution balance:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchBalance()
+
+    window.addEventListener("wave:balance-update", fetchBalance)
+    window.addEventListener("wave:risk-report", fetchBalance)
+
+    return () => {
+      window.removeEventListener("wave:balance-update", fetchBalance)
+      window.removeEventListener("wave:risk-report", fetchBalance)
+    }
+  }, [fetchBalance])
+
+  const usdcVal = balanceData ? balanceData.usdcBalance : 0
+  const btcVal = balanceData ? balanceData.btcBalance : 0
+  const btcUsdVal = btcVal * BTC_MOCK_PRICE
+  const totalUsd = usdcVal + btcUsdVal
+
+  const usdcPct = totalUsd > 0 ? (usdcVal / totalUsd) * 100 : 50
+  const btcPct = totalUsd > 0 ? (btcUsdVal / totalUsd) * 100 : 50
+
+  // SVG Donut circumference calculation for r=40: 2 * PI * 40 ≈ 251.2
+  const circumference = 251.2
+  const usdcDash = (usdcPct / 100) * circumference
+  const btcDash = (btcPct / 100) * circumference
+  const btcOffset = -usdcDash
 
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold">Asset Distribution</h2>
-        <button>
-          <MoreVertical className="h-5 w-5 text-gray-400" />
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col justify-between">
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-lg font-bold text-foreground">Asset Allocation</h2>
+        <button
+          className="text-xs font-semibold text-emerald-500 hover:text-emerald-400 transition-colors"
+          onClick={() => setShowPercentage(!showPercentage)}
+        >
+          {showPercentage ? "Show Values" : "Show %"}
         </button>
       </div>
 
-      <div className="mb-6">
-        <div className="relative h-48 w-48 mx-auto">
+      <div className="my-3">
+        <div className="relative h-44 w-44 mx-auto flex items-center justify-center">
           {/* SVG Donut Chart */}
           <svg viewBox="0 0 100 100" className="h-full w-full">
-            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f0f0f0" strokeWidth="20" />
+            {/* Background ring */}
+            <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="16" />
 
-            {/* Dynamic segments - we'll calculate stroke-dasharray and stroke-dashoffset */}
+            {/* USDC Segment (Green) */}
             <circle
               cx="50"
               cy="50"
               r="40"
               fill="transparent"
-              stroke="#f97316" // orange-500
-              strokeWidth="20"
-              strokeDasharray="251.2 251.2"
+              stroke="#10b981"
+              strokeWidth="16"
+              strokeDasharray={`${usdcDash} ${circumference}`}
               strokeDashoffset="0"
               transform="rotate(-90 50 50)"
+              style={{ transition: "stroke-dasharray 0.6s ease" }}
             />
 
+            {/* BTC Segment (Orange/Amber) */}
             <circle
               cx="50"
               cy="50"
               r="40"
               fill="transparent"
-              stroke="#3b82f6" // blue-500
-              strokeWidth="20"
-              strokeDasharray="65.31 251.2"
-              strokeDashoffset="-170.82"
+              stroke="#f59e0b"
+              strokeWidth="16"
+              strokeDasharray={`${btcDash} ${circumference}`}
+              strokeDashoffset={`${btcOffset}`}
               transform="rotate(-90 50 50)"
-            />
-
-            <circle
-              cx="50"
-              cy="50"
-              r="40"
-              fill="transparent"
-              stroke="#6b7280" // gray-500
-              strokeWidth="20"
-              strokeDasharray="10.05 251.2"
-              strokeDashoffset="-236.13"
-              transform="rotate(-90 50 50)"
-            />
-
-            <circle
-              cx="50"
-              cy="50"
-              r="40"
-              fill="transparent"
-              stroke="#374151" // gray-700
-              strokeWidth="20"
-              strokeDasharray="5.02 251.2"
-              strokeDashoffset="-246.18"
-              transform="rotate(-90 50 50)"
+              style={{ transition: "stroke-dasharray 0.6s ease, stroke-dashoffset 0.6s ease" }}
             />
           </svg>
 
-          {/* Center text */}
+          {/* Center Text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <div className="text-sm font-medium">Total</div>
-            <div className="text-xl font-bold">$32,170.64</div>
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Total Value</div>
+            <div className="text-lg font-extrabold text-foreground tracking-tight">
+              {!balanceData && isLoading ? "..." : `$${totalUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {assets.map((asset, index) => (
-          <div key={index} className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className={`h-3 w-3 rounded-full ${asset.color} mr-2`}></div>
-              <span className="text-sm">{asset.name}</span>
-            </div>
-            <div className="text-sm font-medium">
-              {showPercentage
-                ? `${asset.percentage}%`
-                : `$${((32170.64 * asset.percentage) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            </div>
+      {/* Asset Breakdown List */}
+      <div className="space-y-2.5 pt-1">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center">
+            <div className="h-3 w-3 rounded-full bg-emerald-500 mr-2 border border-emerald-400/30" />
+            <span className="font-semibold text-foreground">USD Coin (USDC)</span>
           </div>
-        ))}
-      </div>
+          <div className="font-mono font-bold text-foreground">
+            {showPercentage
+              ? `${usdcPct.toFixed(1)}%`
+              : `$${usdcVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          </div>
+        </div>
 
-      <div className="mt-4 text-center">
-        <button
-          className="text-xs text-emerald-600 hover:text-emerald-700"
-          onClick={() => setShowPercentage(!showPercentage)}
-        >
-          Show {showPercentage ? "Values" : "Percentages"}
-        </button>
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center">
+            <div className="h-3 w-3 rounded-full bg-amber-500 mr-2 border border-amber-400/30" />
+            <span className="font-semibold text-foreground">Bitcoin (BTC)</span>
+          </div>
+          <div className="font-mono font-bold text-foreground">
+            {showPercentage
+              ? `${btcPct.toFixed(1)}%`
+              : `$${btcUsdVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -1,9 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { Star, Wifi, WifiOff } from "lucide-react"
-import { GATEWAY_URL } from "@/lib/auth"
-import { createMarketWebSocket, ConnectionStatus, PriceTickPayload } from "@/lib/market-websocket"
+import { useMarketStream } from "@/context/market-context"
 
 type Coin = {
   id: string
@@ -119,123 +118,33 @@ function formatPct(pct: number) {
 }
 
 export default function LiveMarketTable() {
+  const { latestTick, connStatus, flashMap } = useMarketStream()
   const [coins, setCoins] = useState<Coin[]>(initialCoins)
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("All Cryptocurrencies")
-  const [flash, setFlash] = useState<Record<string, "up" | "down" | undefined>>({})
-  const [connStatus, setConnStatus] = useState<ConnectionStatus>("CONNECTING")
 
-  // Refs for tracking previous prices and timeouts without extra re-renders
-  const pricesRef = useRef<Record<string, number>>({
-    btc: 68059.49,
-    usdt: 1.015,
-  })
-  const flashTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-
-  // Trigger temporary flash animation for a coin row
-  const triggerFlash = useCallback((coinId: string, direction: "up" | "down") => {
-    setFlash((prev) => ({ ...prev, [coinId]: direction }))
-    if (flashTimeouts.current[coinId]) {
-      clearTimeout(flashTimeouts.current[coinId])
-    }
-    flashTimeouts.current[coinId] = setTimeout(() => {
-      setFlash((prev) => ({ ...prev, [coinId]: undefined }))
-    }, 800)
-  }, [])
-
-  // 1. REST API Initial Seeding
+  // Sync coins with live ticks from MarketStreamContext
   useEffect(() => {
-    let isMounted = true
+    if (!latestTick || !latestTick.btcUsd) return
 
-    async function seedInitialTicks() {
-      const primaryUrl = `${GATEWAY_URL}/api/v1/market/price/tick`
-      const fallbackUrl = "http://localhost:8081/api/v1/market/price/tick"
-
-      try {
-        let res = await fetch(primaryUrl).catch(() => null)
-        if (!res || !res.ok) {
-          res = await fetch(fallbackUrl).catch(() => null)
-        }
-
-        if (res && res.ok && isMounted) {
-          const tick: PriceTickPayload = await res.json()
-          if (tick.btcUsd && tick.btcUsd > 0) {
-            pricesRef.current.btc = tick.btcUsd
-            pricesRef.current.usdt = tick.usdcUsd || 1.0
-
-            setCoins((prev) =>
-              prev.map((c) => {
-                if (c.id === "btc") {
-                  return { ...c, price: tick.btcUsd, change24h: tick.btc24hPct || c.change24h }
-                }
-                if (c.id === "usdt" && tick.usdcUsd) {
-                  return { ...c, price: tick.usdcUsd }
-                }
-                return c
-              })
-            )
+    setCoins((prev) =>
+      prev.map((c) => {
+        if (c.id === "btc") {
+          return {
+            ...c,
+            price: latestTick.btcUsd,
+            change24h: latestTick.btc24hPct ?? c.change24h,
           }
         }
-      } catch (err) {
-        console.warn("Initial REST tick seeding failed:", err)
-      }
-    }
-
-    seedInitialTicks()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  // 2. WebSocket STOMP Live Subscription
-  useEffect(() => {
-    const wsManager = createMarketWebSocket()
-
-    const unsubStatus = wsManager.onStatusChange((status) => {
-      setConnStatus(status)
-    })
-
-    const unsubPrices = wsManager.subscribePrices((tick) => {
-      if (!tick.btcUsd) return
-
-      // Handle BTC update
-      const oldBtc = pricesRef.current.btc || tick.btcUsd
-      if (tick.btcUsd !== oldBtc) {
-        const dir = tick.btcUsd > oldBtc ? "up" : "down"
-        triggerFlash("btc", dir)
-        pricesRef.current.btc = tick.btcUsd
-      }
-
-      // Handle USDC/USDT update
-      if (tick.usdcUsd) {
-        const oldUsdc = pricesRef.current.usdt || tick.usdcUsd
-        if (tick.usdcUsd !== oldUsdc) {
-          const dir = tick.usdcUsd > oldUsdc ? "up" : "down"
-          triggerFlash("usdt", dir)
-          pricesRef.current.usdt = tick.usdcUsd
+        if (c.id === "usdt" && latestTick.usdcUsd) {
+          return {
+            ...c,
+            price: latestTick.usdcUsd,
+          }
         }
-      }
-
-      setCoins((prev) =>
-        prev.map((c) => {
-          if (c.id === "btc") {
-            return { ...c, price: tick.btcUsd, change24h: tick.btc24hPct ?? c.change24h }
-          }
-          if (c.id === "usdt" && tick.usdcUsd) {
-            return { ...c, price: tick.usdcUsd }
-          }
-          return c
-        })
-      )
-    })
-
-    return () => {
-      unsubPrices()
-      unsubStatus()
-      wsManager.disconnect()
-      Object.values(flashTimeouts.current).forEach(clearTimeout)
-    }
-  }, [triggerFlash])
+        return c
+      })
+    )
+  }, [latestTick])
 
   const toggleFavorite = (id: string) => {
     setCoins((prev) => prev.map((c) => (c.id === id ? { ...c, favorite: !c.favorite } : c)))
@@ -338,9 +247,9 @@ export default function LiveMarketTable() {
                 </td>
                 <td
                   className={`py-4 px-6 text-right font-bold tracking-tight rounded transition-all duration-300 ${
-                    flash[coin.id] === "up"
+                    flashMap[coin.id] === "up"
                       ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-extrabold"
-                      : flash[coin.id] === "down"
+                      : flashMap[coin.id] === "down"
                       ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold"
                       : ""
                   }`}

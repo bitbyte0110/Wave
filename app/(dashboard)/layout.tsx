@@ -1,16 +1,18 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState, Suspense, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Bell } from "lucide-react"
+import { Bell } from "lucide-react"
 import SideNavigation from "@/components/side-navigation"
 import AccountDropdown from "@/components/account-dropdown"
 import MobileSidebarToggle from "@/components/mobile-sidebar-toggle"
+import HeaderSearch from "@/components/header-search"
 import { isAuthenticated } from "@/lib/auth"
+import { MarketStreamProvider, useMarketStream } from "@/context/market-context"
+import { toast, Toaster } from "sonner"
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -20,10 +22,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   >([])
 
   const notificationDropdownRef = useRef<HTMLDivElement>(null)
+  const { notifications } = useMarketStream()
+  const processedNotifIds = useRef<Set<string>>(new Set())
 
   // Check if user is logged in
   useEffect(() => {
-    // Check for login status or JWT token
     const loggedIn = isAuthenticated() || sessionStorage.getItem("isLoggedIn") === "true" || document.cookie.includes("isLoggedIn=true")
 
     if (!loggedIn) {
@@ -32,6 +35,80 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setIsLoading(false)
     }
   }, [router])
+
+  // Sync STOMP notifications from Global Market Context
+  useEffect(() => {
+    if (!notifications || notifications.length === 0) return
+
+    notifications.forEach((notification) => {
+      const key = `${notification.txId}_${notification.status}`
+      if (processedNotifIds.current.has(key)) return
+
+      processedNotifIds.current.add(key)
+
+      const level: "Low" | "Moderate" | "Elevated" =
+        notification.remark && notification.remark.toLowerCase().includes("high")
+          ? "Elevated"
+          : notification.remark && notification.remark.toLowerCase().includes("moderate")
+          ? "Moderate"
+          : "Low"
+
+      toast.success(`AI Risk Audit Complete: ${notification.remark}`, {
+        description: `Transaction #${notification.txId} · Status: ${notification.status}`,
+      })
+
+      setRiskReports((prev) => [
+        {
+          id: Date.now(),
+          title: `AI Risk Audit #${notification.txId}`,
+          detail: `${notification.remark} (${notification.status})`,
+          level,
+          time: "Just now",
+        },
+        ...prev,
+      ])
+    })
+  }, [notifications])
+
+  // Custom Event listener for instant swap notifications
+  useEffect(() => {
+    function handleCustomRiskReport(event: Event) {
+      const detail = (event as CustomEvent).detail as {
+        usd: number
+        btc: number
+        rate: number
+        time?: string
+      }
+
+      if (!detail || !detail.usd) return
+
+      const level: "Low" | "Moderate" | "Elevated" =
+        detail.usd >= 25000 ? "Elevated" : detail.usd >= 5000 ? "Moderate" : "Low"
+
+      const remark = `Swapped $${detail.usd.toLocaleString()} → ${detail.btc ? detail.btc.toFixed(6) : "0"} BTC @ $${detail.rate ? detail.rate.toLocaleString() : "68,059"}. Risk: ${level}.`
+
+      toast.info("Swap Executed — AI Risk Audit Queued", {
+        description: remark,
+      })
+
+      setRiskReports((prev) => [
+        {
+          id: Date.now(),
+          title: "Swap Executed",
+          detail: remark,
+          level,
+          time: "Just now",
+        },
+        ...prev,
+      ])
+    }
+
+    window.addEventListener("wave:risk-report", handleCustomRiskReport)
+
+    return () => {
+      window.removeEventListener("wave:risk-report", handleCustomRiskReport)
+    }
+  }, [])
 
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
@@ -83,37 +160,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [])
 
-  // Listen for swap confirmations and slide open the AI risk report notification
-  useEffect(() => {
-    function handleRiskReport(event: Event) {
-      const detail = (event as CustomEvent).detail as {
-        usd: number
-        btc: number
-        rate: number
-        time: string
-      }
-
-      // Derive a lightweight risk assessment from the trade size.
-      const level: "Low" | "Moderate" | "Elevated" =
-        detail.usd >= 25000 ? "Elevated" : detail.usd >= 5000 ? "Moderate" : "Low"
-
-      setRiskReports((prev) => [
-        {
-          id: Date.now(),
-          title: "AI Risk Report",
-          detail: `Swapped $${detail.usd.toLocaleString()} → ${detail.btc.toFixed(6)} BTC @ $${detail.rate.toLocaleString()}. Exposure impact: ${level}. Volatility within your configured limits.`,
-          level,
-          time: "Just now",
-        },
-        ...prev,
-      ])
-      setNotificationDropdownOpen(true)
-    }
-
-    window.addEventListener("wave:risk-report", handleRiskReport)
-    return () => window.removeEventListener("wave:risk-report", handleRiskReport)
-  }, [])
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -139,6 +185,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
+      <Toaster position="top-right" richColors />
       <div className="h-full w-full">
         <div className="bg-card shadow-lg h-full">
           {/* Header */}
@@ -147,17 +194,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div id="mobile-sidebar-toggle">
                 <MobileSidebarToggle onToggle={setMobileSidebarOpen} isOpen={mobileSidebarOpen} />
               </div>
-              <h1 className="text-primary font-bold text-xl">Your Logo</h1>
+              <h1 className="text-primary font-bold text-xl">Wave Terminal</h1>
             </div>
 
-            <div className="relative hidden sm:block">
-              <input
-                type="text"
-                placeholder="Search here"
-                className="bg-muted rounded-full py-2 px-4 pr-10 text-sm w-80"
-              />
-              <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            </div>
+            <HeaderSearch />
 
             <div className="flex items-center space-x-5">
               <div className="relative" ref={notificationDropdownRef}>
@@ -167,9 +207,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   aria-label="Notifications"
                 >
                   <Bell className="h-6 w-6 text-foreground" />
-                  <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                    {12 + riskReports.length}
-                  </span>
+                  {riskReports.length > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-emerald-500 text-slate-950 font-extrabold text-xs rounded-full h-5 w-5 flex items-center justify-center animate-bounce">
+                      {riskReports.length}
+                    </span>
+                  )}
                 </button>
 
                 {notificationDropdownOpen && (
@@ -178,8 +220,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <div className="flex items-center justify-between">
                         <h3 className="font-medium">Notifications</h3>
                         <div className="flex items-center space-x-2">
-                          <span className="text-xs text-primary hover:text-primary/90 cursor-pointer">
-                            Mark all as read
+                          <span
+                            onClick={() => setRiskReports([])}
+                            className="text-xs text-primary hover:text-primary/90 cursor-pointer"
+                          >
+                            Clear all
                           </span>
                         </div>
                       </div>
@@ -199,10 +244,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                               <span
                                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                                   report.level === "Elevated"
-                                    ? "bg-red-100 text-red-700"
+                                    ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
                                     : report.level === "Moderate"
-                                      ? "bg-amber-100 text-amber-700"
-                                      : "bg-emerald-100 text-emerald-700"
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                    : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
                                 }`}
                               >
                                 {report.level} risk
@@ -250,5 +295,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
     </div>
+  )
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <MarketStreamProvider>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </MarketStreamProvider>
   )
 }

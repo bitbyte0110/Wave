@@ -1,145 +1,171 @@
 "use client"
 
-import { useState } from "react"
-import { Eye, EyeOff, TrendingUp, TrendingDown, MoreVertical } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { Eye, EyeOff, TrendingUp, TrendingDown, RefreshCw } from "lucide-react"
+import { GATEWAY_URL, getAuthUser } from "@/lib/auth"
+import { getWalletBalanceCache, setWalletBalanceCache, CachedWalletBalance } from "@/lib/wallet-cache"
+
+const BTC_MOCK_PRICE = 68059.49
 
 export default function WalletBalance() {
   const [showBalance, setShowBalance] = useState(true)
-  const [timeframe, setTimeframe] = useState("1W")
+  const [balanceData, setBalanceData] = useState<CachedWalletBalance | null>(() => getWalletBalanceCache())
+  const [isLoading, setIsLoading] = useState(false)
 
-  const cryptoAssets = [
-    {
-      name: "Bitcoin",
-      symbol: "BTC",
-      icon: "₿",
-      iconColor: "bg-orange-500",
-      balance: "0.5473",
-      value: "$21,892.00",
-      change: "+2.3%",
-      changeType: "up",
-    },
-    {
-      name: "Ethereum",
-      symbol: "ETH",
-      icon: "Ξ",
-      iconColor: "bg-blue-500",
-      balance: "4.2134",
-      value: "$8,426.80",
-      change: "-0.8%",
-      changeType: "down",
-    },
-    {
-      name: "Litecoin",
-      symbol: "LTC",
-      icon: "Ł",
-      iconColor: "bg-gray-500",
-      balance: "12.3456",
-      value: "$1,234.56",
-      change: "+1.2%",
-      changeType: "up",
-    },
-    {
-      name: "Ripple",
-      symbol: "XRP",
-      icon: "✕",
-      iconColor: "bg-gray-700",
-      balance: "1,234.5678",
-      value: "$617.28",
-      change: "+0.5%",
-      changeType: "up",
-    },
-  ]
+  const fetchBalance = useCallback(async () => {
+    setIsLoading(true)
+    const user = getAuthUser()
+    const userId = user?.userId || 42
+
+    const primaryUrl = `${GATEWAY_URL}/api/v1/wallet/balance/${userId}`
+    const fallbackUrl = `http://localhost:8084/api/v1/wallet/balance/${userId}`
+
+    try {
+      let res = await fetch(primaryUrl).catch(() => null)
+      if (!res || !res.ok) {
+        res = await fetch(fallbackUrl).catch(() => null)
+      }
+
+      if (res && res.ok) {
+        const data = await res.json()
+        const parsed = {
+          userId: Number(data.userId || userId),
+          usdcBalance: Number(data.usdcBalance || 0),
+          btcBalance: Number(data.btcBalance || 0),
+        }
+        setBalanceData({ ...parsed, cachedAt: Date.now() })
+        setWalletBalanceCache(parsed)
+      }
+    } catch (err) {
+      console.warn("Failed to fetch wallet balance:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchBalance()
+
+    window.addEventListener("wave:balance-update", fetchBalance)
+    window.addEventListener("wave:risk-report", fetchBalance)
+
+    return () => {
+      window.removeEventListener("wave:balance-update", fetchBalance)
+      window.removeEventListener("wave:risk-report", fetchBalance)
+    }
+  }, [fetchBalance])
+
+  const usdcVal = balanceData ? balanceData.usdcBalance : 0
+  const btcVal = balanceData ? balanceData.btcBalance : 0
+  const totalUsd = usdcVal + btcVal * BTC_MOCK_PRICE
 
   return (
-    <div className="bg-white rounded-lg border p-4">
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold">Wallet Balance</h2>
+        <h2 className="text-lg font-bold text-foreground">Wallet Balance</h2>
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowBalance(!showBalance)}
-            className="p-1 rounded-md hover:bg-gray-100"
+            className="p-1.5 rounded-lg border border-border hover:bg-muted transition-colors text-muted-foreground"
             aria-label={showBalance ? "Hide balance" : "Show balance"}
           >
-            {showBalance ? <Eye className="h-5 w-5 text-gray-500" /> : <EyeOff className="h-5 w-5 text-gray-500" />}
+            {showBalance ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </button>
-          <button className="p-1 rounded-md hover:bg-gray-100">
-            <MoreVertical className="h-5 w-5 text-gray-500" />
+          <button
+            onClick={fetchBalance}
+            disabled={isLoading}
+            className="p-1.5 rounded-lg border border-border hover:bg-muted transition-colors text-muted-foreground"
+            title="Refresh Balance"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin text-emerald-500" : ""}`} />
           </button>
         </div>
       </div>
 
-      <div className="mb-6">
-        <div className="text-sm text-gray-500">Total Balance</div>
-        <div className="text-3xl font-bold">{showBalance ? "$32,170.64" : "••••••••"}</div>
-        <div className="flex items-center mt-1">
-          <TrendingUp className="h-4 w-4 text-emerald-500 mr-1" />
-          <span className="text-sm text-emerald-500 font-medium">+$642.58 (2.0%)</span>
-          <span className="text-xs text-gray-500 ml-2">Past 24h</span>
+      <div className="mb-6 p-4 rounded-xl bg-muted/40 border border-border">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Portfolio Balance</div>
+        <div className="text-3xl font-extrabold text-foreground mt-1 tracking-tight">
+          {!showBalance
+            ? "••••••••"
+            : !balanceData && isLoading
+            ? "..."
+            : `$${totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         </div>
+
+        {totalUsd > 0 ? (
+          <div className="flex items-center mt-2 text-xs font-semibold text-emerald-500">
+            <TrendingUp className="h-3.5 w-3.5 mr-1" />
+            <span>+$240.14 (+2.45%) past 24h</span>
+          </div>
+        ) : (
+          <div className="flex items-center mt-2 text-xs font-semibold text-rose-500">
+            <TrendingDown className="h-3.5 w-3.5 mr-1" />
+            <span>-$0.00 (-0.00%) past 24h</span>
+          </div>
+        )}
       </div>
 
-      <div className="flex justify-between mb-4">
-        <h3 className="font-medium">Your Assets</h3>
-        <div className="flex space-x-1">
-          {["24H", "1W", "1M", "1Y", "ALL"].map((period) => (
-            <button
-              key={period}
-              className={`px-2 py-1 text-xs rounded ${timeframe === period ? "bg-gray-200" : "hover:bg-gray-100"}`}
-              onClick={() => setTimeframe(period)}
-            >
-              {period}
-            </button>
-          ))}
-        </div>
+      <div className="flex justify-between mb-3">
+        <h3 className="font-semibold text-sm text-foreground">Your Assets</h3>
       </div>
 
-      <div className="overflow-x-auto -mx-4 px-4">
-        <table className="min-w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="text-xs text-gray-500 border-b">
-              <th className="pb-2 text-left">ASSET</th>
+            <tr className="text-[11px] text-muted-foreground border-b border-border font-bold uppercase tracking-wider">
+              <th className="pb-2">ASSET</th>
               <th className="pb-2 text-right">BALANCE</th>
-              <th className="pb-2 text-right">VALUE</th>
-              <th className="pb-2 text-right">CHANGE</th>
+              <th className="pb-2 text-right">VALUE (USD)</th>
             </tr>
           </thead>
-          <tbody>
-            {cryptoAssets.map((asset, index) => (
-              <tr key={index} className="border-b last:border-0">
-                <td className="py-3">
-                  <div className="flex items-center">
-                    <div className={`${asset.iconColor} rounded-full h-8 w-8 flex items-center justify-center mr-3`}>
-                      <span className="text-white text-xs">{asset.icon}</span>
-                    </div>
-                    <div>
-                      <div className="font-medium">{asset.name}</div>
-                      <div className="text-xs text-gray-500">{asset.symbol}</div>
-                    </div>
+          <tbody className="divide-y divide-border text-sm">
+            {/* USDC Row */}
+            <tr className="hover:bg-muted/40 transition-colors">
+              <td className="py-3">
+                <div className="flex items-center">
+                  <div className="bg-emerald-500/20 text-emerald-400 rounded-full h-8 w-8 flex items-center justify-center mr-3 font-bold border border-emerald-500/30">
+                    $
                   </div>
-                </td>
-                <td className="py-3 text-right">
-                  <div className="font-medium">{showBalance ? asset.balance : "•••••"}</div>
-                  <div className="text-xs text-gray-500">{asset.symbol}</div>
-                </td>
-                <td className="py-3 text-right">
-                  <div className="font-medium">{showBalance ? asset.value : "•••••"}</div>
-                </td>
-                <td className="py-3 text-right">
-                  <div
-                    className={`flex items-center justify-end ${
-                      asset.changeType === "up" ? "text-emerald-500" : "text-red-500"
-                    }`}
-                  >
-                    {asset.changeType === "up" ? (
-                      <TrendingUp className="h-4 w-4 mr-1" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4 mr-1" />
-                    )}
-                    {asset.change}
+                  <div>
+                    <div className="font-bold text-foreground">USD Coin</div>
+                    <div className="text-xs text-muted-foreground font-semibold">USDC</div>
                   </div>
-                </td>
-              </tr>
-            ))}
+                </div>
+              </td>
+              <td className="py-3 text-right">
+                <div className="font-mono font-bold text-foreground">
+                  {!showBalance ? "•••••" : !balanceData && isLoading ? "..." : usdcVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-xs text-muted-foreground">USDC</div>
+              </td>
+              <td className="py-3 text-right font-mono font-bold text-foreground">
+                {!showBalance ? "•••••" : !balanceData && isLoading ? "..." : `$${usdcVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </td>
+            </tr>
+
+            {/* BTC Row */}
+            <tr className="hover:bg-muted/40 transition-colors">
+              <td className="py-3">
+                <div className="flex items-center">
+                  <div className="bg-amber-500/20 text-amber-400 rounded-full h-8 w-8 flex items-center justify-center mr-3 font-bold border border-amber-500/30">
+                    ₿
+                  </div>
+                  <div>
+                    <div className="font-bold text-foreground">Bitcoin</div>
+                    <div className="text-xs text-muted-foreground font-semibold">BTC</div>
+                  </div>
+                </div>
+              </td>
+              <td className="py-3 text-right">
+                <div className="font-mono font-bold text-foreground">
+                  {!showBalance ? "•••••" : !balanceData && isLoading ? "..." : btcVal.toFixed(6)}
+                </div>
+                <div className="text-xs text-muted-foreground">BTC</div>
+              </td>
+              <td className="py-3 text-right font-mono font-bold text-foreground">
+                {!showBalance ? "•••••" : !balanceData && isLoading ? "..." : `$${(btcVal * BTC_MOCK_PRICE).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>

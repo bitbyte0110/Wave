@@ -1,7 +1,9 @@
 package com.wave.swap;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 
 /**
  * Wave Swap Engine — entry point.
@@ -16,5 +18,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class SwapEngineApplication {
     public static void main(String[] args) {
         SpringApplication.run(SwapEngineApplication.class, args);
+    }
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
     }
 }

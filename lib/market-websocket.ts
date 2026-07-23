@@ -11,10 +11,19 @@ export interface PriceTickPayload {
   timestampMs: number
 }
 
+export interface AuditNotificationPayload {
+  txId: number
+  userId: number
+  status: string
+  remark: string
+  auditedAtMs: number
+}
+
 export type ConnectionStatus = "CONNECTED" | "CONNECTING" | "DISCONNECTED"
 
 export interface MarketWebSocketManager {
   subscribePrices: (callback: (tick: PriceTickPayload) => void) => () => void
+  subscribeUserNotifications: (userId: number, callback: (notification: AuditNotificationPayload) => void) => () => void
   onStatusChange: (callback: (status: ConnectionStatus) => void) => () => void
   disconnect: () => void
 }
@@ -27,6 +36,7 @@ export function createMarketWebSocket(): MarketWebSocketManager {
   let status: ConnectionStatus = "CONNECTING"
   const statusListeners = new Set<(status: ConnectionStatus) => void>()
   const priceSubscribers = new Set<(tick: PriceTickPayload) => void>()
+  const notificationSubscribers = new Map<number, Set<(n: AuditNotificationPayload) => void>>()
 
   function updateStatus(newStatus: ConnectionStatus) {
     status = newStatus
@@ -43,13 +53,8 @@ export function createMarketWebSocket(): MarketWebSocketManager {
     reconnectDelay: 5000,
     heartbeatIncoming: 4000,
     heartbeatOutgoing: 4000,
-    debug: (str) => {
-      if (process.env.NODE_ENV === "development") {
-        // console.log("[STOMP]", str)
-      }
-    },
+    debug: () => {},
     onConnect: () => {
-      // console.log("STOMP Connected to:", currentWsUrl)
       updateStatus("CONNECTED")
 
       // Subscribe to price broadcasts
@@ -61,6 +66,18 @@ export function createMarketWebSocket(): MarketWebSocketManager {
           console.error("Failed to parse STOMP price tick:", err)
         }
       })
+
+      // Subscribe to user notification queues dynamically
+      notificationSubscribers.forEach((callbacks, userId) => {
+        stompClient.subscribe(`/queue/notifications/${userId}`, (message: IMessage) => {
+          try {
+            const payload: AuditNotificationPayload = JSON.parse(message.body)
+            callbacks.forEach((cb) => cb(payload))
+          } catch (err) {
+            console.error(`Failed to parse user notification for user ${userId}:`, err)
+          }
+        })
+      })
     },
     onDisconnect: () => {
       updateStatus("DISCONNECTED")
@@ -71,7 +88,6 @@ export function createMarketWebSocket(): MarketWebSocketManager {
     },
     onWebSocketClose: () => {
       updateStatus("CONNECTING")
-      // Toggle fallback URL on disconnect/reconnect attempt
       currentWsUrl = currentWsUrl === primaryWsUrl ? fallbackWsUrl : primaryWsUrl
     },
   })
@@ -85,15 +101,41 @@ export function createMarketWebSocket(): MarketWebSocketManager {
         priceSubscribers.delete(callback)
       }
     },
+    subscribeUserNotifications: (userId: number, callback) => {
+      if (!notificationSubscribers.has(userId)) {
+        notificationSubscribers.set(userId, new Set())
+      }
+      const userCallbacks = notificationSubscribers.get(userId)!
+      userCallbacks.add(callback)
+
+      if (stompClient.connected) {
+        stompClient.subscribe(`/queue/notifications/${userId}`, (message: IMessage) => {
+          try {
+            const payload: AuditNotificationPayload = JSON.parse(message.body)
+            userCallbacks.forEach((cb) => cb(payload))
+          } catch (err) {
+            console.error(`Failed to parse user notification for user ${userId}:`, err)
+          }
+        })
+      }
+
+      return () => {
+        userCallbacks.delete(callback)
+        if (userCallbacks.size === 0) {
+          notificationSubscribers.delete(userId)
+        }
+      }
+    },
     onStatusChange: (callback) => {
       statusListeners.add(callback)
-      callback(status) // Immediate initial status call
+      callback(status)
       return () => {
         statusListeners.delete(callback)
       }
     },
     disconnect: () => {
       priceSubscribers.clear()
+      notificationSubscribers.clear()
       statusListeners.clear()
       stompClient.deactivate()
     },

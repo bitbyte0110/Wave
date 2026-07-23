@@ -8,7 +8,7 @@
 |---|---|
 | [app/layout.tsx](file:///e:/Development/Wave/app/layout.tsx) | Root HTML shell — sets fonts, global CSS, theme provider |
 | [app/(dashboard)/layout.tsx](file:///e:/Development/Wave/app/(dashboard)/layout.tsx) | Authenticated shell — top header bar, sidebar, notification bell, auth guard (`sessionStorage` check → redirect `/login`) |
-| [components/side-navigation.tsx](file:///e:/Development/Wave/components/side-navigation.tsx) | Sidebar nav component with 5 links: Dashboard, Wallet, Statistics, AI Chat, Settings |
+| [components/side-navigation.tsx](file:///e:/Development/Wave/components/side-navigation.tsx) | Sidebar nav component with links: Dashboard, Wallet, Swap, Settings |
 
 -
 
@@ -20,7 +20,6 @@
 - **Components used:**
   - [components/dashboard/stats-overview.tsx](file:///e:/Development/Wave/components/dashboard/stats-overview.tsx) — Global Cap & 24h Volume cards
   - [components/dashboard/live-market-table.tsx](file:///e:/Development/Wave/components/dashboard/live-market-table.tsx) — Live price ticker table
-  - [components/dashboard/portfolio-allocation.tsx](file:///e:/Development/Wave/components/dashboard/portfolio-allocation.tsx) — Portfolio donut / allocation breakdown
 - **Status:** Structure matches PRD. Needs real WebSocket price stream wired up.
 
 #### Wallet → Module C + D + E (Ledger + Swap + Simulation)
@@ -39,20 +38,8 @@
 #### Settings → Module F (Settings Mock)
 - **Route:** `/settings`
 - **Page:** [app/(dashboard)/settings/page.tsx](file:///e:/Development/Wave/app/(dashboard)/settings/page.tsx)
-- **Sub-sections:** Account · Notifications · Appearance · Language & Region · Payment Methods · Security
-- **Status:** Fully static mock UI. Matches PRD intent. No backend wiring needed for demo.
-
-#### Statistics — NOT in PRD (Template Leftover)
-- **Route:** `/statistics`
-- **Page:** [app/(dashboard)/statistics/page.tsx](file:///e:/Development/Wave/app/(dashboard)/statistics/page.tsx)
-- **Content:** Generic market stats page — top gainers/losers tables, portfolio performance SVG chart, trading volume bar chart. All data is hardcoded mock values.
-- **Decision needed:** Remove this route entirely, or repurpose as a dedicated read-only market overview fed by the Market Streaming Service (Service 2).
-
-#### AI Chat — NOT in PRD (Template Leftover)
-- **Route:** `/chat`
-- **Page:** [app/(dashboard)/chat/page.tsx](file:///e:/Development/Wave/app/(dashboard)/chat/page.tsx)
-- **Content:** Generic AI trading assistant chatbot UI with randomised mock responses. Not connected to any backend.
-- **Decision needed:** Remove this route, or repurpose — e.g. surface the AI Risk Audit result feed here rather than only in the notification bell.
+- **Sub-sections:** Account · Appearance · Security (Change Password)
+- **Status:** Interactive UI with live user session integration, theme settings, and fully functional password update form.
 
 ---
 
@@ -75,6 +62,14 @@
 | 🔴 High | Wire Dashboard live tickers to WebSocket (Service 2) |
 | 🔴 High | Wire Wallet Deposit/Withdraw/Swap tabs to backend REST API (Service 1) |
 | 🔴 High | Replace `sessionStorage` auth flag with real JWT token handling |
-| 🟡 Medium | Decide fate of `/statistics` and `/chat` routes (remove or repurpose) |
 | 🟡 Medium | Implement notification bell WebSocket listener (Service 4 push events) |
-| 🟢 Low | Replace `Transfer` tab in Wallet (not in PRD) or keep as internal feature |
+
+### 5.5 Top Search Bar Implementation (`HeaderSearch`)
+
+* **New Component:** Added `components/header-search.tsx` and integrated it into `app/(dashboard)/layout.tsx`.
+* **Live Market Feed:** Uses `useMarketStream()` WebSocket for real-time asset prices and 24h changes (BTC, ETH, USDT, BNB, XRP).
+* **Categorized Search Overlay:**
+  **Live Market Crypto:** Real-time price tracking with direct click-to-swap navigation (`/swap?from=...`).
+   **Navigation:** Quick routes to *Dashboard*, *Wallet Ledger*, *Instant Swap*, and *Settings*.
+   **Quick Actions:** Direct shortcuts for *Deposit Funds* and *Instant Swap*.
+* **UX & Accessibility:** Supports global `Ctrl+K` / `⌘K` focus hotkey, `↑` / `↓` / `Enter` keyboard navigation, `Esc` dismiss, and click-outside closing.

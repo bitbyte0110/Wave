@@ -5,6 +5,7 @@ import com.wave.swap.controller.dto.DepositRequest;
 import com.wave.swap.controller.dto.SwapRequest;
 import com.wave.swap.controller.dto.WithdrawRequest;
 import com.wave.swap.entity.Wallet;
+import com.wave.swap.repository.TransactionRepository;
 import com.wave.swap.service.IdempotencyService;
 import com.wave.swap.service.WalletService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,8 @@ public class WalletController {
 
     private final WalletService walletService;
     private final IdempotencyService idempotencyService;
+    private final TransactionRepository transactionRepository;
+
 
     @PostMapping("/deposit")
     public ResponseEntity<?> deposit(@RequestBody DepositRequest request) {
@@ -108,6 +111,18 @@ public class WalletController {
             return ResponseEntity.badRequest().body(errorBody(ex.getMessage()));
         }
     }
+
+    @GetMapping("/transactions/{userId}")
+    public ResponseEntity<?> getTransactions(@PathVariable Long userId) {
+        log.info("TRANSACTIONS QUERY ▶ userId={}", userId);
+        try {
+            return ResponseEntity.ok(transactionRepository.findByUserIdOrderByCreatedAtDesc(userId));
+        } catch (RuntimeException ex) {
+            log.warn("TRANSACTIONS QUERY FAILED – {}", ex.getMessage());
+            return ResponseEntity.badRequest().body(errorBody(ex.getMessage()));
+        }
+    }
+
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
