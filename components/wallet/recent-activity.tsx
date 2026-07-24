@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Clock } from "lucide-react"
-import { GATEWAY_URL, getAuthUser } from "@/lib/auth"
+import { GATEWAY_URL, getAuthUser, fetchWithAuth } from "@/lib/auth"
 import { useMarketStream } from "@/context/market-context"
 import {
   getTransactionHistoryCache,
@@ -21,11 +21,11 @@ export default function RecentActivity() {
     const user = getAuthUser()
     const userId = user?.userId || 42
 
-    const primaryUrl = `${GATEWAY_URL}/api/v1/wallet/transactions/${userId}`
+    const primaryUrl = `/api/v1/wallet/transactions/${userId}`
     const fallbackUrl = `http://localhost:8084/api/v1/wallet/transactions/${userId}`
 
     try {
-      let res = await fetch(primaryUrl).catch(() => null)
+      let res = await fetchWithAuth(primaryUrl).catch(() => null)
       if (!res || !res.ok) {
         res = await fetch(fallbackUrl).catch(() => null)
       }

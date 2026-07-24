@@ -43,6 +43,8 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
         if (path.startsWith("/api/v1/auth/") ||
             path.startsWith("/api/v1/market/") ||
             path.startsWith("/api/v1/wallet/balance/") ||
+            path.startsWith("/api/v1/wallet/transactions/") ||
+            path.startsWith("/ws") ||
             path.startsWith("/api/v1/internal/")) {
             return chain.filter(exchange);
         }

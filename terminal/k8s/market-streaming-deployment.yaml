@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-streaming
+  namespace: wave
+  labels:
+    app: market-streaming
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: market-streaming
+  template:
+    metadata:
+      labels:
+        app: market-streaming
+    spec:
+      containers:
+        - name: market-streaming
+          image: wave/market-streaming:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: SPRING_RABBITMQ_PORT
+              value: "5672"
+            - name: SPRING_REDIS_HOST
+              value: "redis"
+            - name: SPRING_REDIS_PORT
+              value: "6379"
+          envFrom:
+            - secretRef:
+                name: rabbitmq-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-streaming
+  namespace: wave
+spec:
+  selector:
+    app: market-streaming
+  ports:
+    - port: 8081
+      targetPort: 8081

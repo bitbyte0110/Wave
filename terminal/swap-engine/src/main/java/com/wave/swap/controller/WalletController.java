@@ -112,11 +112,33 @@ public class WalletController {
         }
     }
 
+    public record TransactionDto(
+            Long id,
+            Long userId,
+            String type,
+            String assetTraded,
+            java.math.BigDecimal amount,
+            String aiAuditRemark,
+            String createdAt
+    ) {}
+
     @GetMapping("/transactions/{userId}")
     public ResponseEntity<?> getTransactions(@PathVariable Long userId) {
         log.info("TRANSACTIONS QUERY ▶ userId={}", userId);
         try {
-            return ResponseEntity.ok(transactionRepository.findByUserIdOrderByCreatedAtDesc(userId));
+            var list = transactionRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                    .stream()
+                    .map(tx -> new TransactionDto(
+                            tx.getId(),
+                            userId,
+                            tx.getType() != null ? tx.getType().name() : "SWAP",
+                            tx.getAssetTraded(),
+                            tx.getAmount(),
+                            tx.getAiAuditRemark(),
+                            tx.getCreatedAt() != null ? tx.getCreatedAt().toString() : java.time.LocalDateTime.now().toString()
+                    ))
+                    .toList();
+            return ResponseEntity.ok(list);
         } catch (RuntimeException ex) {
             log.warn("TRANSACTIONS QUERY FAILED – {}", ex.getMessage());
             return ResponseEntity.badRequest().body(errorBody(ex.getMessage()));

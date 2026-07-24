@@ -2,57 +2,57 @@
 
 Wave is an event-driven, microservices-based digital asset platform built for low-latency market data streaming, atomic balance ledger execution, and real-time AI risk auditing.
 
-The system decouples high-frequency market data ingestion from transactional database paths using asynchronous message queues, optimistic/pessimistic lock strategies, and an isolated LLM processing pipeline.
+The system decouples high-frequency market data ingestion from transactional database paths using asynchronous message queues, pessimistic write-locking strategies, and an isolated LLM processing pipeline.
 
 ---
 
 ## Key Architecture & Features
 
-### 1. High-Concurrency Transaction Engine
+### 1. High-Concurrency Transaction Engine (`swap-engine`)
 * **Atomic Financial Operations:** Prevents double-spending and race conditions under heavy load using explicit MySQL pessimistic locking (`SELECT ... FOR UPDATE`).
 * **Strict Balance Validation:** Financial assertions are calculated after acquiring database locks within `@Transactional` boundaries.
 * **Idempotency Safeguards:** All balance-mutating endpoints enforce an `X-Idempotency-Key` (UUIDv4) header mapped through Redis key-value stores to safely intercept network retries.
 * **Arbitrary-Precision Arithmetic:** Implements Java `BigDecimal` end-to-end to eliminate floating-point precision loss in ledger calculations.
 
-### 2. Distributed Asynchronous Pipeline
-* **Decoupled AI Risk Auditing:** Sub-50ms execution responses are achieved by offloading external LLM analysis to background consumers via **RabbitMQ**.
-* **Real-time Push Notifications:** Audit reports and execution receipts are pushed down targeted WebSocket channels upon completion without blocking the primary transactional path.
+### 2. Edge Routing & Session Security (`gateway` & `auth-service`)
+* **Spring Cloud Gateway:** Central Edge entry point (Port 8080) handling reactive JWT authentication, CORS, and downstream header propagation (`X-User-Id`).
+* **In-Memory Token & HttpOnly Cookies:** Access tokens remain strictly in JS memory while refresh token rotation (RTR) is managed via 7-day HttpOnly cookies and Redis token family tracking.
 
-### 3. Low-Latency Market Data Architecture
+### 3. Distributed Asynchronous Pipeline & AI Auditing (`risk-audit-worker`)
+* **Decoupled AI Risk Auditing:** Sub-50ms execution responses are achieved by offloading external LLM analysis (`gemini-2.0-flash`) to background consumers via **RabbitMQ**.
+* **Real-time Push Notifications:** Audit reports and execution receipts are pushed down targeted STOMP WebSocket channels upon completion without blocking the primary transactional path.
+
+### 4. Low-Latency Market Data Architecture (`market-streaming`)
 * **Frequency Isolation:** Segregates static macro data polling (Redis-cached) from high-frequency ticker updates (WebSocket streaming).
-* **Targeted UI Rendering:** Differential state triggers localized UI re-renders on rate flashes, maintaining low CPU consumption on the client.
+* **Targeted UI Rendering:** Triggers localized UI re-renders on price flashes, maintaining low CPU consumption on the client.
 
 ---
 
 ## System Architecture
 
 ```
-                       +------------------------+
-                       |   Next.js 14 Frontend  |
-                       |  (TypeScript / React)  |
-                       +-----------+------------+
-                                   |
-                         HTTP / WebSocket
-                                   |
-                                   v
-                       +------------------------+
-                       |   Spring Boot Engine   |
-                       |  (Transaction / Auth)  |
-                       +---+----------------+---+
-                           |                |
-             Pessimistic   |                | Async Event
-               Locking     v                v
-                     +----------+    +--------------+
-                     |  MySQL   |    |   RabbitMQ   |
-                     |  Ledger  |    | Event Broker |
-                     +----------+    +-------+------+
-                                             |
-                                     Consume |
-                                             v
-                                     +---------------+
-                                     | AI Risk Audit |
-                                     |   Service     |
-                                     +---------------+
+                       ┌─────────────────────────┐
+                       │   Next.js Web Frontend  │ (Port 3000)
+                       └────────────┬────────────┘
+                                    │ HTTP / WebSockets
+                                    ▼
+                       ┌─────────────────────────┐
+                       │  Spring Cloud Gateway   │ (Port 8080)
+                       └────────────┬────────────┘
+                                    │
+     ┌───────────────────┬──────────┴────────────┬───────────────────┐
+     │ (Public REST)     │ (Public REST)        │ (Internal REST)    │ (Public WebSockets)
+     ▼                   ▼                      │                   ▼
+┌───────────────┐   ┌───────────────┐           │           ┌───────────────┐
+│ Auth-Service  │   │ Swap-Engine   │◄──────────┤           │Market-Stream  │
+└───────┬───────┘   └───────┬───────┘           │           └───────┬───────┘
+        │                   │                   │                   │
+        │ user.registered   │ swap.events       │ PATCH /remark     │
+        ▼                   ▼                   │                   ▼
+┌─────────────┐     ┌─────────────┐             │            ┌─────────────┐
+│  RabbitMQ   │     │ Risk-Audit- │─────────────┘            │    Redis    │
+│   Exchange  │────►│   Worker    │                            └─────────────┘
+└─────────────┘     └─────────────┘
 ```
 
 ---
@@ -60,23 +60,24 @@ The system decouples high-frequency market data ingestion from transactional dat
 ## Tech Stack
 
 ### Core Runtime & Frameworks
-* **Frontend:** React, Next.js (App Router), TypeScript, Tailwind CSS, Shadcn UI
-* **Backend:** Java 17+, Spring Boot (Web REST, Data JPA, WebSockets)
-* **Data Stores:** MySQL 8.0 (Immutable Financial Ledger), Redis (Market State Cache & Idempotency)
+* **Frontend:** React 19, Next.js (App Router), TypeScript, Tailwind CSS, Shadcn UI
+* **Backend:** Java 17+, Spring Boot 3.4.1 (Web REST, Data JPA, WebSockets), Spring Cloud Gateway
+* **Data Stores:** MySQL 8.0 (Immutable Financial Ledger), Redis 7.0 (Market Cache, Idempotency & RTR Store)
 * **Messaging Broker:** RabbitMQ
-* **Infrastructure & Containerization:** Docker, Docker Compose, Kubernetes (Minikube)
+* **DevOps & Containerization:** Multi-stage Dockerfiles, Docker Compose, Minikube Kubernetes
 
 ---
 
-## Module Overview
+## Microservices Topology
 
-| Module | Core Responsibility | Technical Implementation |
-| :--- | :--- | :--- |
-| **Auth Gateway** | JWT Authentication | Generates secure tokens, persisted via HTTP-only cookies/headers for REST & WS handshakes. |
-| **Market Console** | Live Ticker & Macro Stream | Combines REST polling (Redis cache) with high-frequency WebSocket streams. |
-| **Audit Ledger** | Balance & Asset Analytics | Visualizes immutable transaction logs (`DEPOSIT`, `WITHDRAW`, `SWAP`) with Recharts. |
-| **Instant Swap Panel** | Rate Locking & Execution | Guarantees 5s rate quotes before emitting async balance-swap directives to the backend. |
-| **Asset Network Gateway** | On-Chain / Ingress Testing | Handles multi-stage confirmation flows and strict client-side balance assertions prior to execution. |
+| Service | Port | Database / Storage | Key Responsibility |
+| :--- | :--- | :--- | :--- |
+| **`gateway`** | `8080` | Redis (CORS / JWT) | Edge Gateway, JWT Filter & Route Proxying |
+| **`auth-service`** | `8082` | MySQL (`users`), Redis (RTR) | Registration, Login, Refresh Token Rotation & Profiles |
+| **`swap-engine`** | `8084` | MySQL (`wallets`, `transactions`) | Wallet CRUD, Balances, Deposits, Swaps & Ledger |
+| **`market-streaming`** | `8081` | Redis | Polling CoinGecko & STOMP WebSocket price feeds |
+| **`risk-audit-worker`** | `8083` | None (Decoupled Worker) | Consumes RabbitMQ events -> Gemini LLM AI Risk Analysis |
+| **`frontend`** | `3000` | Local In-Memory Auth | Next.js Single-Page Application |
 
 ---
 
@@ -85,9 +86,11 @@ The system decouples high-frequency market data ingestion from transactional dat
 ### Prerequisites
 * Docker Desktop & Kubernetes (`minikube`) enabled
 * Java 17 or higher
-* Node.js 18+
+* Node.js 20+
 
-### Quick Start (Local Containerized Environment)
+---
+
+### Option A: Local Infrastructure with Docker Compose
 
 1. **Clone the repository:**
    ```bash
@@ -95,23 +98,66 @@ The system decouples high-frequency market data ingestion from transactional dat
    cd wave
    ```
 
-2. **Start Infrastructure Services (MySQL, Redis, RabbitMQ):**
+2. **Configure Environment Variables:**
+   Create a `.env` file in the root directory:
+   ```env
+   JWT_SECRET=V2F2ZVRlcm1pbmFsU3VwZXJTZWNyZXRLZXkyMDI2X1NlY3VyZV9KV1RfVG9rZW5fS2V5XzI1NkJpdHM=
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+
+3. **Start Core Infrastructure (MySQL, Redis, RabbitMQ):**
    ```bash
    docker-compose up -d
    ```
 
-3. **Run Backend Service:**
+4. **Build & Run Backend Microservices:**
    ```bash
-   cd backend
-   ./mvnw spring-boot:run
+   cd terminal
+   mvn clean package -DskipTests
    ```
 
-4. **Run Frontend Application:**
+5. **Start Frontend:**
    ```bash
-   cd frontend
    npm install
    npm run dev
    ```
 
-5. **Access Application:**
-   Navigate to `http://localhost:3000` in your web browser.
+---
+
+### Option B: Local Kubernetes Deployment (Minikube)
+
+1. **Start Minikube Cluster:**
+   ```bash
+   minikube start --driver=docker
+   ```
+
+2. **Create Secrets Configuration:**
+   Copy `terminal/k8s/secrets.yaml.example` (or create `terminal/k8s/secrets.yaml` locally):
+   ```yaml
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: gemini-secret
+     namespace: wave
+   type: Opaque
+   stringData:
+     GEMINI_API_KEY: "YOUR_GEMINI_API_KEY_HERE"
+   ```
+
+3. **Deploy Manifests to Kubernetes:**
+   ```bash
+   kubectl apply -f terminal/k8s/namespace.yaml
+   kubectl apply -f terminal/k8s/
+   ```
+
+4. **Access Web Application:**
+   ```bash
+   minikube service frontend -n wave
+   ```
+
+---
+
+## Security & Secrets Management
+* **Zero Secret Commitment:** `terminal/k8s/secrets.yaml`, `.env`, and local credentials are strictly excluded in `.gitignore`.
+* **In-Memory Tokens:** Client Access Tokens never touch `localStorage` or `sessionStorage`.
+* **Idempotency Protection:** All financial mutations require `X-Idempotency-Key` headers.

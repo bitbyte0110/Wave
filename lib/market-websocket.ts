@@ -96,7 +96,7 @@ export function createMarketWebSocket(): MarketWebSocketManager {
     },
     onWebSocketClose: () => {
       updateStatus("CONNECTING")
-      currentWsUrl = currentWsUrl === primaryWsUrl ? fallbackWsUrl : primaryWsUrl
+      currentWsUrl = primaryWsUrl
     },
   })
 

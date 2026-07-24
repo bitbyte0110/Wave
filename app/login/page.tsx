@@ -54,7 +54,7 @@ function LoginFormContent() {
     try {
       const response = await postAuthApi("/api/v1/auth/login", { email, password })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => ({ error: `Server error (${response.status})` }))
 
       if (!response.ok) {
         throw new Error(data.error || "Authentication failed. Please check your credentials.")

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Eye, EyeOff, TrendingUp, TrendingDown, RefreshCw } from "lucide-react"
-import { GATEWAY_URL, getAuthUser } from "@/lib/auth"
+import { GATEWAY_URL, getAuthUser, fetchWithAuth } from "@/lib/auth"
 import { getWalletBalanceCache, setWalletBalanceCache, CachedWalletBalance } from "@/lib/wallet-cache"
 
 const BTC_MOCK_PRICE = 68059.49
@@ -17,11 +17,11 @@ export default function WalletBalance() {
     const user = getAuthUser()
     const userId = user?.userId || 42
 
-    const primaryUrl = `${GATEWAY_URL}/api/v1/wallet/balance/${userId}`
+    const primaryUrl = `/api/v1/wallet/balance/${userId}`
     const fallbackUrl = `http://localhost:8084/api/v1/wallet/balance/${userId}`
 
     try {
-      let res = await fetch(primaryUrl).catch(() => null)
+      let res = await fetchWithAuth(primaryUrl).catch(() => null)
       if (!res || !res.ok) {
         res = await fetch(fallbackUrl).catch(() => null)
       }

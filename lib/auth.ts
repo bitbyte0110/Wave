@@ -4,7 +4,9 @@
  * with HttpOnly Refresh Cookie support & automatic service fallback.
  */
 
-export const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+export const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL !== undefined 
+  ? process.env.NEXT_PUBLIC_GATEWAY_URL 
+  : "";
 export const AUTH_SERVICE_DIRECT_URL = "http://localhost:8082";
 
 export interface UserSession {

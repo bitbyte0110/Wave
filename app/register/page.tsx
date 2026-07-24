@@ -89,7 +89,7 @@ function RegisterFormContent() {
         password: formData.password,
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => ({ error: `Server error (${response.status})` }))
 
       if (!response.ok) {
         throw new Error(data.error || "Registration failed. Please try again.")

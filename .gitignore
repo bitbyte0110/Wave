@@ -77,3 +77,4 @@ yarn-error.log*
 *.swo
 # Kubernetes local secrets
 terminal/k8s/secrets.yaml
+.agent/k8s_state
