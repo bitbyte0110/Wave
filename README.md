@@ -103,7 +103,7 @@ The system decouples high-frequency market data ingestion from transactional dat
 2. **Configure Environment Variables:**
    Create a `.env` file in the root directory:
    ```env
-   JWT_SECRET=V2F2ZVRlcm1pbmFsU3VwZXJTZWNyZXRLZXkyMDI2X1NlY3VyZV9KV1RfVG9rZW5fS2V5XzI1NkJpdHM=
+   JWT_SECRET=your_jwt_secret_here
    GEMINI_API_KEY=your_gemini_api_key_here
    ```
 
