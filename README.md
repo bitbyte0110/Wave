@@ -2,8 +2,10 @@
 
 Wave is an event-driven, microservices-based digital asset platform built for low-latency market data streaming, atomic balance ledger execution, and real-time AI risk auditing.
 
+![login](image/loginPage.png)
+
 The system decouples high-frequency market data ingestion from transactional database paths using asynchronous message queues, pessimistic write-locking strategies, and an isolated LLM processing pipeline.
-![login](image\loginPage.png)
+
 ---
 
 ## Key Architecture & Features
