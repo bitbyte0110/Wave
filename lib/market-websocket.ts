@@ -48,6 +48,8 @@ export function createMarketWebSocket(): MarketWebSocketManager {
   const fallbackWsUrl = `${MARKET_STREAMING_DIRECT_URL}/ws`
   let currentWsUrl = primaryWsUrl
 
+  let reconnectAttempts = 0
+
   const stompClient = new Client({
     webSocketFactory: () => new SockJS(currentWsUrl),
     beforeConnect: () => {
@@ -58,11 +60,12 @@ export function createMarketWebSocket(): MarketWebSocketManager {
         }
       }
     },
-    reconnectDelay: 5000,
+    reconnectDelay: 3000,
     heartbeatIncoming: 4000,
     heartbeatOutgoing: 4000,
     debug: () => {},
     onConnect: () => {
+      reconnectAttempts = 0
       updateStatus("CONNECTED")
 
       // Subscribe to price broadcasts
@@ -95,8 +98,13 @@ export function createMarketWebSocket(): MarketWebSocketManager {
       updateStatus("DISCONNECTED")
     },
     onWebSocketClose: () => {
+      reconnectAttempts++
       updateStatus("CONNECTING")
-      currentWsUrl = primaryWsUrl
+      // If unable to connect after 2 attempts on current URL, toggle to fallback
+      if (reconnectAttempts >= 2) {
+        currentWsUrl = currentWsUrl === primaryWsUrl ? fallbackWsUrl : primaryWsUrl
+        reconnectAttempts = 0
+      }
     },
   })
 

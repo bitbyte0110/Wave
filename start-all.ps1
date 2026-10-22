@@ -2,6 +2,10 @@
 
 Write-Host "Starting Wave Microservices..." -ForegroundColor Cyan
 
+# 0. Ensure Docker Infrastructure is up (MySQL, Redis, RabbitMQ)
+Write-Host "Verifying Docker infrastructure containers..." -ForegroundColor Yellow
+docker compose up -d
+
 # 1. Start Spring Boot Services in separate PowerShell windows
 Write-Host "Starting Gateway..." -ForegroundColor Yellow
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd E:\Development\Wave\terminal; mvn spring-boot:run -pl gateway"
