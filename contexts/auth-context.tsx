@@ -15,6 +15,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export const DEMO_USER_SESSION: UserSession = {
+  token: "demo-jwt-token-guest",
+  userId: 9999,
+  username: "demo_trader",
+  email: "demo@wave.exchange",
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserSession | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -30,6 +37,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const silentRefresh = useCallback(async (): Promise<boolean> => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("isDemoUser") === "true") {
+      setMemoryAuth(DEMO_USER_SESSION);
+      setUser(DEMO_USER_SESSION);
+      setAccessToken(DEMO_USER_SESSION.token);
+      setIsLoading(false);
+      return true;
+    }
+
     try {
       const res = await postAuthApi("/api/v1/auth/refresh");
       if (res.ok) {
@@ -68,6 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("isDemoUser");
+    }
     try {
       await postAuthApi("/api/v1/auth/logout");
     } catch (err) {

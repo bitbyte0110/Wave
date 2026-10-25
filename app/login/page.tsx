@@ -4,9 +4,9 @@ import type React from "react"
 import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Eye, EyeOff, ArrowRight, UserPlus, Lock, Mail, ShieldAlert, Waves } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, UserPlus, Lock, Mail, ShieldAlert, Waves, Sparkles } from "lucide-react"
 import { postAuthApi } from "@/lib/auth"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuth, DEMO_USER_SESSION } from "@/contexts/auth-context"
 
 function LoginFormContent() {
   const router = useRouter()
@@ -20,6 +20,24 @@ function LoginFormContent() {
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
+
+  const handleDemoLogin = () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("isDemoUser", "true")
+      if (!localStorage.getItem("wallet_balance_cache")) {
+        localStorage.setItem(
+          "wallet_balance_cache",
+          JSON.stringify({
+            usdcBalance: 25420.5,
+            btcBalance: 1.845,
+            timestamp: Date.now(),
+          })
+        )
+      }
+    }
+    loginUser(DEMO_USER_SESSION)
+    router.push("/dashboard")
+  }
 
   // Check for registration success message from redirect
   useEffect(() => {
@@ -76,6 +94,11 @@ function LoginFormContent() {
 
       router.push("/dashboard")
     } catch (err: any) {
+      // Demo fallback if backend is unreachable or demo credentials used
+      if (email.toLowerCase().includes("demo") || !process.env.NEXT_PUBLIC_GATEWAY_URL) {
+        handleDemoLogin()
+        return
+      }
       setError(err.message || "Failed to connect to API Gateway on port 8080.")
     } finally {
       setIsLoading(false)
@@ -84,7 +107,7 @@ function LoginFormContent() {
   }
 
   return (
-    <div className="max-w-md w-full space-y-8 p-8 bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden">
+    <div className="max-w-md w-full space-y-6 p-8 bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden">
       {/* Glow backdrop effect */}
       <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -103,6 +126,28 @@ function LoginFormContent() {
         <p className="mt-2 text-sm text-slate-400">Sign in to your Wave account</p>
       </div>
 
+      {/* 🌟 1-Click Fast Demo Login Button */}
+      <button
+        type="button"
+        id="quick-demo-login-btn"
+        onClick={handleDemoLogin}
+        className="w-full relative z-10 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold text-sm text-emerald-950 bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 hover:from-emerald-300 hover:to-teal-200 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] group cursor-pointer"
+      >
+        <Sparkles className="h-4 w-4 text-emerald-950 group-hover:rotate-12 transition-transform" />
+        <span>1-Click Demo Account Login</span>
+        <ArrowRight className="h-4 w-4 ml-1 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+      </button>
+
+      {/* Divider */}
+      <div className="relative my-4 text-center z-10">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-slate-800" />
+        </div>
+        <span className="relative bg-slate-900/90 px-3 text-[11px] uppercase tracking-wider text-slate-500">
+          or sign in with credentials
+        </span>
+      </div>
+
       {successMessage && (
         <div className="bg-emerald-950/60 border border-emerald-500/40 p-4 rounded-xl text-sm text-emerald-300 flex items-start space-x-3">
           <div className="mt-0.5 text-emerald-400">✓</div>
@@ -117,7 +162,7 @@ function LoginFormContent() {
         </div>
       )}
 
-      <form className="mt-8 space-y-5 relative z-10" onSubmit={handleLogin} id="login-form">
+      <form className="space-y-4 relative z-10" onSubmit={handleLogin} id="login-form">
         <div className="space-y-4">
           <div>
             <label htmlFor="login-email" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
